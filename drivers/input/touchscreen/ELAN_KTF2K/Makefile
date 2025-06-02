@@ -1,2 +1,0 @@
-obj-$(CONFIG_TOUCHSCREEN_ELAN_KTF2K) += ektf2k.o
-

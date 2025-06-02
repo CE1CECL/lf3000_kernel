@@ -1,2 +1,0 @@
-obj-$(CONFIG_TOUCHSCREEN_Ilitek_2839_7INCH) += ilitek2839_7.o
-
