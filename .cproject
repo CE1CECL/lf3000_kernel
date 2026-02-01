@@ -78,7 +78,7 @@
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.logicalop.1821967352" name="Warn if suspicious logical ops (-Wlogical-op)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.logicalop"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.agreggatereturn.487557123" name="Warn if struct is returned (-Wagreggate-return)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.agreggatereturn"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.floatequal.353827501" name="Warn if floats are compared as equal (-Wfloat-equal)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.floatequal"/>
-							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors.1223604738" name="Generate errors instead of warnings (-Werror)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors.1223604738" name="Generate errors instead of warnings ()" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.other.1487689252" name="Other warning flags" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.other"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.level.230062594" name="Debug level" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.level"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.format.154115291" name="Debug format" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.format"/>
@@ -212,7 +212,7 @@
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.logicalop.1310116275" name="Warn if suspicious logical ops (-Wlogical-op)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.logicalop"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.agreggatereturn.1979126830" name="Warn if struct is returned (-Wagreggate-return)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.agreggatereturn"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.floatequal.789994017" name="Warn if floats are compared as equal (-Wfloat-equal)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.floatequal"/>
-							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors.1197700216" name="Generate errors instead of warnings (-Werror)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors.1197700216" name="Generate errors instead of warnings ()" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.other.1566444045" name="Other warning flags" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.other"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.level.920956795" name="Debug level" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.level"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.format.498882954" name="Debug format" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.format"/>
@@ -346,7 +346,7 @@
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.logicalop.553857158" name="Warn if suspicious logical ops (-Wlogical-op)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.logicalop"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.agreggatereturn.785825488" name="Warn if struct is returned (-Wagreggate-return)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.agreggatereturn"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.floatequal.1369245161" name="Warn if floats are compared as equal (-Wfloat-equal)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.floatequal"/>
-							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors.1924989020" name="Generate errors instead of warnings (-Werror)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors.1924989020" name="Generate errors instead of warnings ()" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.other.854022657" name="Other warning flags" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.other"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.level.1886612893" name="Debug level" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.level"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.format.496418430" name="Debug format" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.format"/>
@@ -487,7 +487,7 @@
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.logicalop.967346578" name="Warn if suspicious logical ops (-Wlogical-op)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.logicalop"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.agreggatereturn.1437472999" name="Warn if struct is returned (-Wagreggate-return)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.agreggatereturn"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.floatequal.1001621033" name="Warn if floats are compared as equal (-Wfloat-equal)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.floatequal"/>
-							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors.763520537" name="Generate errors instead of warnings (-Werror)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors.763520537" name="Generate errors instead of warnings ()" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.other.817124792" name="Other warning flags" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.other"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.level.1943848482" name="Debug level" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.level"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.format.117785089" name="Debug format" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.format"/>
@@ -621,7 +621,7 @@
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.logicalop.735585564" name="Warn if suspicious logical ops (-Wlogical-op)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.logicalop"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.agreggatereturn.1465256635" name="Warn if struct is returned (-Wagreggate-return)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.agreggatereturn"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.floatequal.1872173636" name="Warn if floats are compared as equal (-Wfloat-equal)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.floatequal"/>
-							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors.753762849" name="Generate errors instead of warnings (-Werror)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors.753762849" name="Generate errors instead of warnings ()" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.other.1921973128" name="Other warning flags" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.other"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.level.1607097190" name="Debug level" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.level"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.format.1072654644" name="Debug format" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.format"/>
@@ -755,7 +755,7 @@
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.logicalop.1856713193" name="Warn if suspicious logical ops (-Wlogical-op)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.logicalop"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.agreggatereturn.1790742692" name="Warn if struct is returned (-Wagreggate-return)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.agreggatereturn"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.floatequal.1927793729" name="Warn if floats are compared as equal (-Wfloat-equal)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.floatequal"/>
-							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors.1788731845" name="Generate errors instead of warnings (-Werror)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors.1788731845" name="Generate errors instead of warnings ()" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.other.549353256" name="Other warning flags" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.other"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.level.1930622523" name="Debug level" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.level"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.format.1457853067" name="Debug format" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.format"/>
@@ -889,7 +889,7 @@
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.logicalop.1951108289" name="Warn if suspicious logical ops (-Wlogical-op)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.logicalop"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.agreggatereturn.1160031502" name="Warn if struct is returned (-Wagreggate-return)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.agreggatereturn"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.floatequal.457520700" name="Warn if floats are compared as equal (-Wfloat-equal)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.floatequal"/>
-							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors.116884869" name="Generate errors instead of warnings (-Werror)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors.116884869" name="Generate errors instead of warnings ()" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.other.118788314" name="Other warning flags" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.other"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.level.1522221948" name="Debug level" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.level"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.format.827679589" name="Debug format" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.format"/>
@@ -1023,7 +1023,7 @@
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.logicalop.37814724" name="Warn if suspicious logical ops (-Wlogical-op)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.logicalop"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.agreggatereturn.2094975810" name="Warn if struct is returned (-Wagreggate-return)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.agreggatereturn"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.floatequal.1696611071" name="Warn if floats are compared as equal (-Wfloat-equal)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.floatequal"/>
-							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors.1082133642" name="Generate errors instead of warnings (-Werror)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors.1082133642" name="Generate errors instead of warnings ()" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.other.739946050" name="Other warning flags" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.other"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.level.2053389507" name="Debug level" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.level"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.format.1130501889" name="Debug format" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.format"/>
@@ -1157,7 +1157,7 @@
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.logicalop.565746751" name="Warn if suspicious logical ops (-Wlogical-op)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.logicalop"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.agreggatereturn.53657104" name="Warn if struct is returned (-Wagreggate-return)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.agreggatereturn"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.floatequal.1030400749" name="Warn if floats are compared as equal (-Wfloat-equal)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.floatequal"/>
-							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors.443345462" name="Generate errors instead of warnings (-Werror)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors.443345462" name="Generate errors instead of warnings ()" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.other.1280126551" name="Other warning flags" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.other"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.level.1986296976" name="Debug level" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.level"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.format.1562628186" name="Debug format" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.format"/>
@@ -1298,7 +1298,7 @@
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.logicalop.1042539422" name="Warn if suspicious logical ops (-Wlogical-op)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.logicalop"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.agreggatereturn.125969953" name="Warn if struct is returned (-Wagreggate-return)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.agreggatereturn"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.floatequal.1210295540" name="Warn if floats are compared as equal (-Wfloat-equal)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.floatequal"/>
-							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors.2107901460" name="Generate errors instead of warnings (-Werror)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors.2107901460" name="Generate errors instead of warnings ()" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.toerrors"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.other.163501345" name="Other warning flags" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.other"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.level.1372875875" name="Debug level" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.level"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.format.36798307" name="Debug format" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.format"/>
