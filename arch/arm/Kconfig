@@ -652,6 +652,27 @@ config ARCH_KS8695
 	  Support for Micrel/Kendin KS8695 "Centaur" (ARM922T) based
 	  System-on-Chip devices.
 
+config ARCH_NXP4330
+	bool "Nexell NXP4330D/Q"
+	select ARCH_CPU_NEXELL
+	select CPU_V7
+	select ARM_AMBA
+	select ARM_GIC
+	select ARM_VIC
+	select HAVE_SMP
+	select MIGHT_HAVE_CACHE_L2X0
+	select ARCH_HAS_CPUFREQ
+	select GENERIC_TIME
+	select GENERIC_CLOCKEVENTS
+	select ZONE_DMA
+	select HAVE_MACH_CLKDEV
+	select NEED_MACH_MEMORY_H
+	select NEED_MACH_IO_H
+	select ARCH_REQUIRE_GPIOLIB
+	select ARM_PATCH_PHYS_VIRT
+	help
+	  Support for Nexell NXP4330 dual/quad core (ARM Cortex A9) platform
+
 config ARCH_W90X900
 	bool "Nuvoton W90X900 CPU"
 	select CPU_ARM926T
@@ -1010,6 +1031,7 @@ config ARCH_ZYNQ
 	select USE_OF
 	help
 	  Support for Xilinx Zynq ARM Cortex A9 Platform
+
 endchoice
 
 #
@@ -1066,6 +1088,9 @@ source "arch/arm/plat-mxc/Kconfig"
 source "arch/arm/mach-mxs/Kconfig"
 
 source "arch/arm/mach-netx/Kconfig"
+
+source "arch/arm/mach-nxp4330/Kconfig"
+source "arch/arm/plat-nxp4330/Kconfig"
 
 source "arch/arm/mach-nomadik/Kconfig"
 source "arch/arm/plat-nomadik/Kconfig"

@@ -75,12 +75,28 @@ obj-$(CONFIG_VIDEO_MT9P031) += mt9p031.o
 obj-$(CONFIG_VIDEO_MT9T001) += mt9t001.o
 obj-$(CONFIG_VIDEO_MT9V011) += mt9v011.o
 obj-$(CONFIG_VIDEO_MT9V032) += mt9v032.o
+obj-$(CONFIG_VIDEO_MT9D111_CAM)	+= mt9d111-nx-cam.o
+obj-$(CONFIG_VIDEO_THP7212_CAM)	+= thine/
 obj-$(CONFIG_VIDEO_SR030PC30)	+= sr030pc30.o
 obj-$(CONFIG_VIDEO_NOON010PC30)	+= noon010pc30.o
 obj-$(CONFIG_VIDEO_M5MOLS)	+= m5mols/
 obj-$(CONFIG_VIDEO_S5K6AA)	+= s5k6aa.o
 obj-$(CONFIG_VIDEO_ADP1653)	+= adp1653.o
 obj-$(CONFIG_VIDEO_AS3645A)	+= as3645a.o
+
+obj-$(CONFIG_VIDEO_S5K5CAGX)    += s5k5cagx.o
+obj-$(CONFIG_VIDEO_S5K4ECGX)	+= s5k4ecgx.o
+obj-$(CONFIG_VIDEO_HI253)       += hi253.o
+obj-$(CONFIG_VIDEO_HI257)       += hi257.o
+obj-$(CONFIG_VIDEO_HM2056)       += hm2056.o
+#obj-$(CONFIG_VIDEO_HI253_HM2056)   += hi253.o hm2056.o #YM 20170210
+obj-$(CONFIG_VIDEO_HI253_HM2056)   += hi25x.o  hm2056.o
+obj-$(CONFIG_VIDEO_SP2518)		+= sp2518.o
+obj-$(CONFIG_VIDEO_SP0A19)		+= sp0a19.o
+obj-$(CONFIG_VIDEO_SP0838)		+= sp0838.o
+obj-$(CONFIG_VIDEO_GC2035)		+= gc2035.o
+obj-$(CONFIG_VIDEO_GC0308)		+= gc0308.o
+obj-$(CONFIG_VIDEO_HM2057)		+= hm2057.o
 
 obj-$(CONFIG_SOC_CAMERA_IMX074)		+= imx074.o
 obj-$(CONFIG_SOC_CAMERA_MT9M001)	+= mt9m001.o
@@ -96,6 +112,7 @@ obj-$(CONFIG_SOC_CAMERA_OV9640)		+= ov9640.o
 obj-$(CONFIG_SOC_CAMERA_OV9740)		+= ov9740.o
 obj-$(CONFIG_SOC_CAMERA_RJ54N1)		+= rj54n1cb0c.o
 obj-$(CONFIG_SOC_CAMERA_TW9910)		+= tw9910.o
+obj-$(CONFIG_SOC_CAMERA_HI253)		+= lf2000/hynix_yac.o
 
 # And now the v4l2 drivers:
 
@@ -136,6 +153,7 @@ obj-$(CONFIG_VIDEOBUF2_DMA_CONTIG)	+= videobuf2-dma-contig.o
 obj-$(CONFIG_VIDEOBUF2_DMA_SG)		+= videobuf2-dma-sg.o
 obj-$(CONFIG_VIDEOBUF2_CMA_PHYS)	+= videobuf2-cma-phys.o
 obj-$(CONFIG_VIDEOBUF2_ION)		+= videobuf2-ion.o
+obj-$(CONFIG_VIDEOBUF2_ION_NXP)		+= videobuf2-ion-nxp.o
 
 obj-$(CONFIG_V4L2_MEM2MEM_DEV) += v4l2-mem2mem.o
 
@@ -195,6 +213,12 @@ obj-$(CONFIG_VIDEO_SAMSUNG_S5P_TV)	+= s5p-tv/
 obj-$(CONFIG_VIDEO_SAMSUNG_S5P_G2D)	+= s5p-g2d/
 
 obj-$(CONFIG_VIDEO_EXYNOS)		+= exynos/
+
+obj-$(CONFIG_V4L2_NEXELL)			+= nexell/
+
+obj-$(CONFIG_V4L2_LF2000)			+= lf2000/
+
+obj-$(CONFIG_V4L2_NEXELL)			+= nexell/
 
 obj-$(CONFIG_BLACKFIN)                  += blackfin/
 

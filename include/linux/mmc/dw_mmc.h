@@ -151,6 +151,7 @@ struct dw_mci {
 	u32			dir_status;
 	struct tasklet_struct	tasklet;
 	struct work_struct	card_work;
+	struct work_struct	resume_work;	/* add by jhkim */
 	unsigned long		pending_events;
 	unsigned long		completed_events;
 	enum dw_mci_state	state;
@@ -277,6 +278,10 @@ struct dw_mci_board {
 	u8 clk_smpl;
 	bool tuned;
 
+	/*
+	 * add by Youngbok Park
+	 */
+	u32 clk_dly;
 	/* cd_type: Type of Card Detection method (see cd_types enum above) */
 	enum dw_mci_cd_types cd_type;
 
@@ -308,6 +313,22 @@ struct dw_mci_board {
 	struct dw_mci_dma_ops *dma_ops;
 	struct dma_pdata *data;
 	struct block_settings *blk_settings;
+	/*
+	 * add by jhkim
+	 */
+	void (*suspend)(struct dw_mci *host);
+	void (*resume)(struct dw_mci *host);
+	void (*late_resume)(struct dw_mci *host);
+	u32		hs_over_clk;
+	u32		hw_timeout;	/* add by jhkim */
+	u32		mode;	/* add by bok	*/
 };
+#define DMA_MODE	1
+#define PIO_MODE	2
+
+#define	DW_MMC_DRIVE_DELAY(n)		((n & 0xFF) << 0)	// write
+#define	DW_MMC_DRIVE_PHASE(n)		((n & 0x03) <<16)	// write
+#define	DW_MMC_SAMPLE_DELAY(n)		((n & 0xFF) << 8)	// read
+#define	DW_MMC_SAMPLE_PHASE(n)		((n & 0x03) <<24)	// read
 
 #endif /* LINUX_MMC_DW_MMC_H */

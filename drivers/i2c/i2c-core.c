@@ -483,6 +483,21 @@ void i2c_unlock_adapter(struct i2c_adapter *adapter)
 }
 EXPORT_SYMBOL_GPL(i2c_unlock_adapter);
 
+
+static unsigned int i2c_read_raw(struct i2c_client *client, unsigned int addr)
+{
+	u8 data[2] = {0};
+	unsigned int value = 0;
+	data[0] = addr;
+
+	if(i2c_master_send(client, data, 1) == 1)
+	{
+	    i2c_master_recv(client, data, 2);
+    	value = (data[0] << 8) | data[1];
+	}
+	return value;
+}
+
 /**
  * i2c_new_device - instantiate an i2c device
  * @adap: the adapter managing the device
@@ -521,6 +536,29 @@ i2c_new_device(struct i2c_adapter *adap, struct i2c_board_info const *info)
 	client->irq = info->irq;
 
 	strlcpy(client->name, info->type, sizeof(client->name));
+
+	printk("I2C CORE :%s : client->name: %s \n",__FUNCTION__, client->name);
+	/* Check ID */
+	if(!strncmp(client->name,"alc562x-codec",sizeof(client->name))) {
+		int vid1, vid2;
+		vid1 = i2c_read_raw(client, (0x7C));
+		vid2 = i2c_read_raw(client, (0x7E));
+		if(vid1 != 0x10EC && vid2 != 0x2303) {
+			dev_err(&adap->dev, "invalid vid1=0x%x, vid1=0x%x \n",vid1, vid2);
+			goto out_err;
+		}
+	}
+
+	if(!strncmp(client->name,"nau88c22",sizeof(client->name)))
+	{
+		int dev_rev, dev_id;
+		dev_rev = i2c_read_raw(client, (0x3E << 1));
+		dev_id = i2c_read_raw(client, (0x3F << 1));
+		if(dev_rev != 0x7F && dev_id != 0x3F) {
+			dev_err(&adap->dev, "invalid dev_rev=0x%x, dev_id=0x%x \n",dev_rev, dev_id);
+			goto out_err;
+		}
+	}
 
 	/* Check for address validity */
 	status = i2c_check_client_addr_validity(client);
@@ -1458,10 +1496,10 @@ static int i2c_default_probe(struct i2c_adapter *adap, unsigned short addr)
 	if (!((addr & ~0x07) == 0x30 || (addr & ~0x0f) == 0x50)
 	 && i2c_check_functionality(adap, I2C_FUNC_SMBUS_QUICK))
 		err = i2c_smbus_xfer(adap, addr, 0, I2C_SMBUS_WRITE, 0,
-				     I2C_SMBUS_QUICK, NULL);
+					 I2C_SMBUS_QUICK, NULL);
 	else if (i2c_check_functionality(adap, I2C_FUNC_SMBUS_READ_BYTE))
 		err = i2c_smbus_xfer(adap, addr, 0, I2C_SMBUS_READ, 0,
-				     I2C_SMBUS_BYTE, &dummy);
+  					 I2C_SMBUS_BYTE, &dummy);
 	else {
 		dev_warn(&adap->dev, "No suitable probing method supported\n");
 		err = -EOPNOTSUPP;
@@ -1603,6 +1641,18 @@ i2c_new_probed_device(struct i2c_adapter *adap,
 	}
 
 	info->addr = addr_list[i];
+	//judge if hi253 or hm2056 per addr
+	if(addr_list[i] == 0x20) {
+		strcpy(info->type, "HI253");
+		printk("%s, type: %s", __func__, info->type);
+	}
+
+	else if(addr_list[i] == 0x24) {
+		strcpy(info->type, "HM2056");
+		printk("%s, type: %s", __func__, info->type);
+	}
+
+	
 	return i2c_new_device(adap, info);
 }
 EXPORT_SYMBOL_GPL(i2c_new_probed_device);
