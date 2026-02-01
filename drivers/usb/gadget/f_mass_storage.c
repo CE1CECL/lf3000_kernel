@@ -1688,8 +1688,11 @@ static int finish_reply(struct fsg_common *common)
 			if (!start_in_transfer(common, bh))
 				rc = -EIO;
 			common->next_buffhd_to_fill = bh->next;
+	// psw0523 fix
+#if 0
 			if (common->can_stall)
 				rc = halt_bulk_in_endpoint(common->fsg);
+#endif
 		}
 		break;
 
@@ -3131,6 +3134,9 @@ struct fsg_module_parameters {
 	unsigned int	nofua_count;
 	unsigned int	luns;	/* nluns */
 	bool		stall;	/* can_stall */
+	
+	char		*vendor_name;
+	char		*product_name;
 };
 
 #define _FSG_MODULE_PARAM_ARRAY(prefix, params, name, type, desc)	\
@@ -3158,7 +3164,12 @@ struct fsg_module_parameters {
 	_FSG_MODULE_PARAM(prefix, params, luns, uint,			\
 			  "number of LUNs");				\
 	_FSG_MODULE_PARAM(prefix, params, stall, bool,			\
-			  "false to prevent bulk stalls")
+			  "false to prevent bulk stalls");	\
+	_FSG_MODULE_PARAM(prefix, params, vendor_name, charp,	\
+			  "Mass Storage Vendor string");				\
+	_FSG_MODULE_PARAM(prefix, params, product_name, charp,	\
+			  "Mass Storage Product string");
+
 
 static void
 fsg_config_from_params(struct fsg_config *cfg,
@@ -3185,8 +3196,8 @@ fsg_config_from_params(struct fsg_config *cfg,
 	/* Let MSF use defaults */
 	cfg->lun_name_format = 0;
 	cfg->thread_name = 0;
-	cfg->vendor_name = 0;
-	cfg->product_name = 0;
+	cfg->vendor_name = params->vendor_name;
+	cfg->product_name = params->product_name;
 	cfg->release = 0xffff;
 
 	cfg->ops = NULL;

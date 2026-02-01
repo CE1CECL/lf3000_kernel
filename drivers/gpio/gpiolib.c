@@ -11,6 +11,14 @@
 #include <linux/of_gpio.h>
 #include <linux/idr.h>
 #include <linux/slab.h>
+#include <linux/cdev.h>
+#include <asm/uaccess.h>
+#include <asm/gpio.h>
+#include <linux/lf3000/gpio_ioctl.h>
+
+#ifdef CONFIG_NXP4330_LEAPFROG
+#include <nx_gpio.h>
+#endif
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/gpio.h>
@@ -45,6 +53,7 @@
  * each GPIO's "requested" flag serves as a lock and refcount.
  */
 static DEFINE_SPINLOCK(gpio_lock);
+#define GPIO_MAJOR		246
 
 struct gpio_desc {
 	struct gpio_chip	*chip;
@@ -83,6 +92,16 @@ static inline void desc_set_label(struct gpio_desc *d, const char *label)
 #endif
 }
 
+static inline unsigned gpio_to_phys(unsigned gpio)
+{
+	if(gpio_desc[gpio].chip->is_virtual)
+	{
+		struct gpio_chip* chip = gpio_desc[gpio].chip;
+		return chip->to_phys(chip, gpio);
+	}
+	return gpio;
+}
+
 /* Warn when drivers omit gpio_request() calls -- legal but ill-advised
  * when setting direction, and otherwise illegal.  Until board setup code
  * and drivers use explicit requests everywhere (which won't happen when
@@ -115,7 +134,9 @@ static int gpio_ensure_requested(struct gpio_desc *desc, unsigned offset)
 	return 0;
 }
 
-/* caller holds gpio_lock *OR* gpio is marked as requested */
+/* caller holds gpio_lock *OR* gpio is marked as requested 
+ * caller is responsible for getting physical gpio number
+ */
 struct gpio_chip *gpio_to_chip(unsigned gpio)
 {
 	return gpio_desc[gpio].chip;
@@ -259,7 +280,7 @@ static ssize_t gpio_direction_store(struct device *dev,
 		status = -EINVAL;
 
 	mutex_unlock(&sysfs_lock);
-	return status ? : size;
+	return status ? 0 : size;
 }
 
 static /* const */ DEVICE_ATTR(direction, 0644,
@@ -539,11 +560,188 @@ static ssize_t gpio_active_low_store(struct device *dev,
 
 	mutex_unlock(&sysfs_lock);
 
-	return status ? : size;
+	return status ? 0 : size;
 }
 
 static const DEVICE_ATTR(active_low, 0644,
 		gpio_active_low_show, gpio_active_low_store);
+
+static ssize_t gpio_pull_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	const struct gpio_desc	*desc = dev_get_drvdata(dev);
+	unsigned		gpio = desc - gpio_desc;
+	ssize_t			status;
+	unsigned 		offset;
+	int			pullup;
+
+	mutex_lock(&sysfs_lock);
+
+	if (!test_bit(FLAG_EXPORT, &desc->flags)) {
+		status = -EIO;
+	} else if(!desc->chip || !desc->chip->get_pull) {
+		status = -EIO;
+	} else {
+		offset = gpio - desc->chip->base;
+		pullup = desc->chip->get_pull(desc->chip, offset);
+		switch(pullup) {
+		case NX_GPIO_PADPULL_DN:
+			status = sprintf(buf, "down\n");
+			break;
+		case NX_GPIO_PADPULL_UP:
+			status = sprintf(buf, "up\n");
+			break;
+		case NX_GPIO_PADPULL_OFF:
+			status = sprintf(buf, "off\n");
+			break;
+		}
+	}
+	
+	mutex_unlock(&sysfs_lock);
+	return status;
+}
+
+static ssize_t gpio_pull_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	struct gpio_desc	*desc = dev_get_drvdata(dev);
+	unsigned		gpio = desc - gpio_desc;
+	ssize_t			status;
+	int			value;
+	unsigned 		offset;
+
+	mutex_lock(&sysfs_lock);
+
+	if (!test_bit(FLAG_EXPORT, &desc->flags)) {
+		status = -EIO;
+	} else if(!desc->chip || !desc->chip->set_pull) {
+		status = -EIO;
+	} else {
+		offset = gpio - desc->chip->base;
+		if (sysfs_streq(buf, "down")) {
+			value = NX_GPIO_PADPULL_DN;
+		} else if (sysfs_streq(buf, "up")) {
+			value = NX_GPIO_PADPULL_UP;
+		} else if (sysfs_streq(buf, "off")) {
+			value = NX_GPIO_PADPULL_OFF;
+		}
+		status = desc->chip->set_pull(desc->chip, offset, value);
+	}
+	
+	mutex_unlock(&sysfs_lock);
+	return status ? 0 : size;
+}
+
+static const DEVICE_ATTR(pull, 0644,
+		gpio_pull_show, gpio_pull_store);
+		
+static ssize_t gpio_current_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	const struct gpio_desc	*desc = dev_get_drvdata(dev);
+	unsigned		gpio = desc - gpio_desc;
+	ssize_t			status;
+
+	mutex_lock(&sysfs_lock);
+
+	if (!test_bit(FLAG_EXPORT, &desc->flags)) {
+		status = -EIO;
+	} else if(!desc->chip || !desc->chip->get_current) {
+		status = -EIO;
+	} else {
+		unsigned offset = gpio - desc->chip->base;
+		int drive_current = desc->chip->get_current(desc->chip, offset);
+		status = sprintf(buf, "%d\n", drive_current);
+	}
+	
+	mutex_unlock(&sysfs_lock);
+	return status;
+}
+
+static ssize_t gpio_current_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	struct gpio_desc	*desc = dev_get_drvdata(dev);
+	unsigned		gpio = desc - gpio_desc;
+	ssize_t			status;
+
+	mutex_lock(&sysfs_lock);
+
+	if (!test_bit(FLAG_EXPORT, &desc->flags)) {
+		status = -EIO;
+	} else if(!desc->chip || !desc->chip->set_current) {
+		status = -EIO;
+	} else {
+		long value;
+		status = strict_strtol(buf, 0, &value);
+		
+		if(status == 0)
+		{
+			unsigned offset = gpio - desc->chip->base;
+			status = desc->chip->set_current(desc->chip, offset, value);
+		}
+	}
+	
+	mutex_unlock(&sysfs_lock);
+	return status ? : size;
+}
+
+static const DEVICE_ATTR(drive_current, 0644,
+		gpio_current_show, gpio_current_store);
+		
+static ssize_t gpio_function_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	const struct gpio_desc	*desc = dev_get_drvdata(dev);
+	unsigned		gpio = desc - gpio_desc;
+	ssize_t			status;
+
+	mutex_lock(&sysfs_lock);
+
+	if (!test_bit(FLAG_EXPORT, &desc->flags)) {
+		status = -EIO;
+	} else if(!desc->chip || !desc->chip->get_function) {
+		status = -EIO;
+	} else {
+		unsigned offset = gpio - desc->chip->base;
+		int pin_function = desc->chip->get_function(desc->chip, offset);
+		status = sprintf(buf, "%d\n", pin_function);
+	}
+	
+	mutex_unlock(&sysfs_lock);
+	return status;
+}
+
+static ssize_t gpio_function_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	struct gpio_desc	*desc = dev_get_drvdata(dev);
+	unsigned		gpio = desc - gpio_desc;
+	ssize_t			status;
+
+	mutex_lock(&sysfs_lock);
+
+	if (!test_bit(FLAG_EXPORT, &desc->flags)) {
+		status = -EIO;
+	} else if(!desc->chip || !desc->chip->set_function) {
+		status = -EIO;
+	} else {
+		long value;
+		status = strict_strtol(buf, 0, &value);
+		
+		if(status == 0)
+		{
+			unsigned offset = gpio - desc->chip->base;
+			status = desc->chip->set_function(desc->chip, offset, value);
+		}
+	}
+	
+	mutex_unlock(&sysfs_lock);
+	return status ? : size;
+}
+
+static const DEVICE_ATTR(function, 0644,
+		gpio_function_show, gpio_function_store);
 
 static const struct attribute *gpio_attrs[] = {
 	&dev_attr_value.attr,
@@ -622,6 +820,7 @@ static ssize_t export_store(struct class *class,
 	 * they may be undone on its behalf too.
 	 */
 
+	gpio = gpio_to_phys(gpio);
 	status = gpio_request(gpio, "sysfs");
 	if (status < 0) {
 		if (status == -EPROBE_DEFER)
@@ -661,6 +860,7 @@ static ssize_t unexport_store(struct class *class,
 	 * request and export were done by on behalf of userspace, so
 	 * they may be undone on its behalf too.
 	 */
+	gpio = gpio_to_phys(gpio);
 	if (test_and_clear_bit(FLAG_SYSFS, &gpio_desc[gpio].flags)) {
 		status = 0;
 		gpio_free(gpio);
@@ -716,6 +916,8 @@ int gpio_export(unsigned gpio, bool direction_may_change)
 	if (!gpio_is_valid(gpio))
 		goto done;
 
+	gpio = gpio_to_phys(gpio);
+
 	mutex_lock(&sysfs_lock);
 
 	spin_lock_irqsave(&gpio_lock, flags);
@@ -751,6 +953,18 @@ int gpio_export(unsigned gpio, bool direction_may_change)
 							&desc->flags)))
 				status = device_create_file(dev,
 						&dev_attr_edge);
+						
+			if (!status && ( desc->chip->set_pull || desc->chip->get_pull ) )
+				status = device_create_file(dev,
+						&dev_attr_pull);
+						
+			if (!status && ( desc->chip->set_current || desc->chip->get_current ) )
+				status = device_create_file(dev,
+						&dev_attr_drive_current);
+
+			if (!status && ( desc->chip->set_function || desc->chip->get_function ) )
+				status = device_create_file(dev,
+						&dev_attr_function);
 
 			if (status != 0)
 				device_unregister(dev);
@@ -796,6 +1010,7 @@ int gpio_export_link(struct device *dev, const char *name, unsigned gpio)
 
 	mutex_lock(&sysfs_lock);
 
+	gpio = gpio_to_phys(gpio);
 	desc = &gpio_desc[gpio];
 
 	if (test_bit(FLAG_EXPORT, &desc->flags)) {
@@ -844,6 +1059,7 @@ int gpio_sysfs_set_active_low(unsigned gpio, int value)
 
 	mutex_lock(&sysfs_lock);
 
+	gpio = gpio_to_phys(gpio);
 	desc = &gpio_desc[gpio];
 
 	if (test_bit(FLAG_EXPORT, &desc->flags)) {
@@ -886,6 +1102,7 @@ void gpio_unexport(unsigned gpio)
 
 	mutex_lock(&sysfs_lock);
 
+	gpio = gpio_to_phys(gpio);
 	desc = &gpio_desc[gpio];
 
 	if (test_bit(FLAG_EXPORT, &desc->flags)) {
@@ -940,8 +1157,13 @@ static int gpiochip_export(struct gpio_chip *chip)
 
 		spin_lock_irqsave(&gpio_lock, flags);
 		gpio = chip->base;
-		while (gpio_desc[gpio].chip == chip)
-			gpio_desc[gpio++].chip = NULL;
+		
+		/* Don't clean up virtual chips */
+		if(!chip->is_virtual)
+		{
+			while (gpio_desc[gpio].chip == chip)
+				gpio_desc[gpio++].chip = NULL;
+		}
 		spin_unlock_irqrestore(&gpio_lock, flags);
 
 		pr_debug("%s: chip %s status %d\n", __func__,
@@ -1019,6 +1241,176 @@ static inline void gpiochip_unexport(struct gpio_chip *chip)
 
 #endif /* CONFIG_GPIO_SYSFS */
 
+/*******************************
+ * character device operations *
+ *******************************/
+ 
+DEFINE_SPINLOCK(gpio_ioctl_lock);
+
+static long gpio_ioctl(struct file *filp, unsigned cmd, unsigned long arg)
+{
+	int retval = 0;
+	void __user *argp = (void __user *)arg;
+	union gpio_cmd c;
+	
+	unsigned long flags;
+	spin_lock_irqsave(&gpio_ioctl_lock, flags);
+
+	switch(cmd) {
+		case GPIO_IOCSOUTVAL:
+		if(!(_IOC_DIR(cmd) & _IOC_WRITE))
+			goto gpio_ioctl_efault;
+		if(copy_from_user((void *)&c, argp, 
+				sizeof(struct outvalue_cmd)))
+			goto gpio_ioctl_efault;
+		gpio_set_value_cansleep(c.outvalue.gpio, 
+					c.outvalue.value);
+		break;
+
+		case GPIO_IOCSOUTENB:
+		if(!(_IOC_DIR(cmd) & _IOC_WRITE))
+			goto gpio_ioctl_efault;
+		if(copy_from_user((void *)&c, argp, sizeof(struct outenb_cmd)))
+			goto gpio_ioctl_efault;
+		if(c.outenb.value)
+			retval = gpio_direction_output(c.outenb.gpio, 0);
+		else
+			retval = gpio_direction_input(c.outenb.gpio);
+		if(retval)
+		{
+			printk(KERN_CRIT "Failed to set output direction. Code: %i\n", retval);
+			retval = -EFAULT;
+		}
+		break;
+
+		case GPIO_IOCXOUTENB:
+		if(copy_from_user((void *)&c, argp, sizeof(struct func_cmd)))
+			goto gpio_ioctl_efault;
+		if(c.func.gpio > ARCH_NR_GPIOS)
+		{
+			retval = -EINVAL;
+			goto gpio_ioctl_done;
+		}
+		c.func.func = (char)test_bit(FLAG_IS_OUT, &(gpio_desc[c.func.gpio].flags));
+		if(copy_to_user(argp, (void *)&c, sizeof(struct func_cmd)))
+			goto gpio_ioctl_efault;
+		retval = 0;
+		break;
+
+		case GPIO_IOCXINVAL:
+		if(copy_from_user((void *)&c, argp, sizeof(struct invalue_cmd)))
+			goto gpio_ioctl_efault;
+		c.invalue.value = gpio_get_value(c.invalue.gpio);
+		if(copy_to_user(argp, (void *)&c, sizeof(struct invalue_cmd)))
+			goto gpio_ioctl_efault;
+		retval = 0;
+		break;
+
+		case GPIO_IOCSFUNC:
+		if(!(_IOC_DIR(cmd) & _IOC_WRITE))
+			goto gpio_ioctl_efault;
+		if(copy_from_user((void *)&c, argp, sizeof(struct func_cmd)))
+			goto gpio_ioctl_efault;
+		retval = gpio_set_function(c.func.gpio, c.func.func);
+		if(retval)
+			retval = -EFAULT;
+		retval = 0;
+		break;
+
+		case GPIO_IOCXFUNC:
+		if(copy_from_user((void *)&c, argp, sizeof(struct func_cmd)))
+			goto gpio_ioctl_efault;
+		
+		retval = gpio_get_function(c.func.gpio);
+		if(retval < 0)
+			goto gpio_ioctl_efault;
+		c.func.func = retval;
+		if(copy_to_user(argp, (void *)&c, sizeof(struct func_cmd)))
+			goto gpio_ioctl_efault;
+		retval = 0;
+		break;
+
+		case GPIO_IOCSDRIVE:
+		if(!(_IOC_DIR(cmd) & _IOC_WRITE))
+			goto gpio_ioctl_efault;
+		if(copy_from_user((void *)&c, argp, sizeof(struct func_cmd)))
+			goto gpio_ioctl_efault;
+		retval = gpio_set_current(c.func.gpio, c.func.func);
+		break;
+
+		case GPIO_IOCXDRIVE:
+		if(copy_from_user((void *)&c, argp, sizeof(struct func_cmd)))
+			goto gpio_ioctl_efault;
+		retval = gpio_get_current(c.func.gpio);
+		if(retval < 0)
+			goto gpio_ioctl_efault;
+		c.func.func = retval;
+		if(copy_to_user(argp, (void *)&c, sizeof(struct func_cmd)))
+			goto gpio_ioctl_efault;
+		retval = 0;
+		break;
+
+		case GPIO_IOCSPULLUP:
+		if(!(_IOC_DIR(cmd) & _IOC_WRITE))
+			goto gpio_ioctl_efault;
+		if(copy_from_user((void *)&c, argp, sizeof(struct func_cmd)))
+			goto gpio_ioctl_efault;
+		retval = gpio_set_pull(c.func.gpio, c.func.func);
+		break;
+
+		case GPIO_IOCXPULLUP:
+		if(copy_from_user((void *)&c, argp, sizeof(struct func_cmd)))
+			goto gpio_ioctl_efault;
+		retval = gpio_get_pull(c.func.gpio);
+		if(retval < 0)
+			goto gpio_ioctl_efault;
+		c.func.func = retval;
+		if(copy_to_user(argp, (void *)&c, sizeof(struct func_cmd)))
+			goto gpio_ioctl_efault;
+		retval = 0;
+		break;
+
+		default: /* unknown command */
+		retval = -ENOTTY;
+	}
+	goto gpio_ioctl_done;
+
+gpio_ioctl_efault:
+	retval = -EFAULT;
+gpio_ioctl_done:
+	spin_unlock_irqrestore(&gpio_ioctl_lock, flags);
+	return retval;
+}
+
+struct file_operations gpio_fops = {
+	.owner = THIS_MODULE,
+	.unlocked_ioctl = gpio_ioctl,
+};
+
+struct cdev gpio_cdev;
+
+static int __init gpio_ioctl_init(void)
+{
+	int devnum;
+	int ret;
+	devnum = MKDEV(GPIO_MAJOR, 0);
+	cdev_init(&gpio_cdev, &gpio_fops);
+	gpio_cdev.owner = THIS_MODULE;
+	gpio_cdev.ops = &gpio_fops;
+	ret = cdev_add(&gpio_cdev, devnum, 1);
+	if(ret) {
+		printk(KERN_ALERT "gpio: failed to get a device\n");
+		return ret;
+	}
+	return 0;
+}
+
+static int __exit gpio_ioctl_exit(void)
+{
+	cdev_del(&gpio_cdev);
+	return 0;
+}
+
 /**
  * gpiochip_add() - register a gpio_chip
  * @chip: the chip to register, with chip->base initialized
@@ -1077,7 +1469,7 @@ int gpiochip_add(struct gpio_chip *chip)
 			 * gpio direction first thing; but until it does,
 			 * we may expose the wrong direction in sysfs.
 			 */
-			gpio_desc[id].flags = !chip->direction_input
+			gpio_desc[gpio_to_phys(id)].flags = !chip->direction_input
 				? (1 << FLAG_IS_OUT)
 				: 0;
 		}
@@ -1126,7 +1518,7 @@ int gpiochip_remove(struct gpio_chip *chip)
 	of_gpiochip_remove(chip);
 
 	for (id = chip->base; id < chip->base + chip->ngpio; id++) {
-		if (test_bit(FLAG_REQUESTED, &gpio_desc[id].flags)) {
+		if (test_bit(FLAG_REQUESTED, &gpio_desc[gpio_to_phys(id)].flags)) {
 			status = -EBUSY;
 			break;
 		}
@@ -1197,6 +1589,7 @@ int gpio_request(unsigned gpio, const char *label)
 		status = -EINVAL;
 		goto done;
 	}
+	gpio = gpio_to_phys(gpio);
 	desc = &gpio_desc[gpio];
 	chip = desc->chip;
 	if (chip == NULL)
@@ -1257,6 +1650,7 @@ void gpio_free(unsigned gpio)
 
 	spin_lock_irqsave(&gpio_lock, flags);
 
+	gpio = gpio_to_phys(gpio);
 	desc = &gpio_desc[gpio];
 	chip = desc->chip;
 	if (chip && test_bit(FLAG_REQUESTED, &desc->flags)) {
@@ -1366,6 +1760,7 @@ const char *gpiochip_is_requested(struct gpio_chip *chip, unsigned offset)
 
 	if (!gpio_is_valid(gpio) || gpio_desc[gpio].chip != chip)
 		return NULL;
+	gpio = gpio_to_phys(gpio);
 	if (test_bit(FLAG_REQUESTED, &gpio_desc[gpio].flags) == 0)
 		return NULL;
 #ifdef CONFIG_DEBUG_FS
@@ -1390,8 +1785,11 @@ int gpio_direction_input(unsigned gpio)
 {
 	unsigned long		flags;
 	struct gpio_chip	*chip;
-	struct gpio_desc	*desc = &gpio_desc[gpio];
+	struct gpio_desc	*desc;
 	int			status = -EINVAL;
+	
+	gpio = gpio_to_phys(gpio);
+	desc = &gpio_desc[gpio];
 
 	spin_lock_irqsave(&gpio_lock, flags);
 
@@ -1445,8 +1843,11 @@ int gpio_direction_output(unsigned gpio, int value)
 {
 	unsigned long		flags;
 	struct gpio_chip	*chip;
-	struct gpio_desc	*desc = &gpio_desc[gpio];
+	struct gpio_desc	*desc;
 	int			status = -EINVAL;
+
+	gpio = gpio_to_phys(gpio);
+	desc = &gpio_desc[gpio];
 
 	/* Open drain pin should not be driven to 1 */
 	if (value && test_bit(FLAG_OPEN_DRAIN,  &desc->flags))
@@ -1513,8 +1914,11 @@ int gpio_set_debounce(unsigned gpio, unsigned debounce)
 {
 	unsigned long		flags;
 	struct gpio_chip	*chip;
-	struct gpio_desc	*desc = &gpio_desc[gpio];
+	struct gpio_desc	*desc;
 	int			status = -EINVAL;
+
+	gpio = gpio_to_phys(gpio);
+	desc = &gpio_desc[gpio];
 
 	spin_lock_irqsave(&gpio_lock, flags);
 
@@ -1547,6 +1951,258 @@ fail:
 	return status;
 }
 EXPORT_SYMBOL_GPL(gpio_set_debounce);
+
+int gpio_set_pull(unsigned gpio, unsigned value)
+{
+	unsigned long		flags;
+	struct gpio_chip	*chip;
+	struct gpio_desc	*desc;
+	int			status = -EINVAL;
+
+	gpio = gpio_to_phys(gpio);
+	desc = &gpio_desc[gpio];
+
+	spin_lock_irqsave(&gpio_lock, flags);
+
+	if (!gpio_is_valid(gpio))
+		goto fail;
+	chip = desc->chip;
+	if (!chip || !chip->set || !chip->set_pull)
+		goto fail;
+	gpio -= chip->base;
+	if (gpio >= chip->ngpio)
+		goto fail;
+	status = gpio_ensure_requested(desc, gpio);
+	if (status < 0)
+		goto fail;
+
+	/* now we know the gpio is valid and chip won't vanish */
+	
+	spin_unlock_irqrestore(&gpio_lock, flags);
+
+	might_sleep_if(chip->can_sleep);
+
+	return chip->set_pull(chip, gpio, value);
+
+fail:
+	spin_unlock_irqrestore(&gpio_lock, flags);
+	if (status)
+		pr_debug("%s: gpio-%d status %d\n",
+			__func__, gpio, status);
+
+	return status;
+}
+EXPORT_SYMBOL(gpio_set_pull);
+
+int gpio_get_pull(unsigned gpio)
+{
+	unsigned long		flags;
+	struct gpio_chip	*chip;
+	struct gpio_desc	*desc;
+	int			status = -EINVAL;
+
+	gpio = gpio_to_phys(gpio);
+	desc = &gpio_desc[gpio];
+
+	spin_lock_irqsave(&gpio_lock, flags);
+
+	if (!gpio_is_valid(gpio))
+		goto fail;
+	chip = desc->chip;
+	if (!chip || !chip->set || !chip->get_pull)
+		goto fail;
+	gpio -= chip->base;
+	if (gpio >= chip->ngpio)
+		goto fail;
+	status = gpio_ensure_requested(desc, gpio);
+	if (status < 0)
+		goto fail;
+
+	/* now we know the gpio is valid and chip won't vanish */
+	
+	spin_unlock_irqrestore(&gpio_lock, flags);
+
+	might_sleep_if(chip->can_sleep);
+
+	return chip->get_pull(chip, gpio);
+
+fail:
+	spin_unlock_irqrestore(&gpio_lock, flags);
+	if (status)
+		pr_debug("%s: gpio-%d status %d\n",
+			__func__, gpio, status);
+
+	return status;
+}
+EXPORT_SYMBOL(gpio_get_pull);
+
+int gpio_set_current(unsigned gpio, unsigned value)
+{
+	unsigned long		flags;
+	struct gpio_chip	*chip;
+	struct gpio_desc	*desc;
+	int			status = -EINVAL;
+
+	gpio = gpio_to_phys(gpio);
+	desc = &gpio_desc[gpio];
+
+	spin_lock_irqsave(&gpio_lock, flags);
+
+	if (!gpio_is_valid(gpio))
+		goto fail;
+	chip = desc->chip;
+	if (!chip || !chip->set || !chip->set_current)
+		goto fail;
+	gpio -= chip->base;
+	if (gpio >= chip->ngpio)
+		goto fail;
+	status = gpio_ensure_requested(desc, gpio);
+	if (status < 0)
+		goto fail;
+
+	/* now we know the gpio is valid and chip won't vanish */
+	
+	spin_unlock_irqrestore(&gpio_lock, flags);
+
+	might_sleep_if(chip->can_sleep);
+
+	return chip->set_current(chip, gpio, value);
+
+fail:
+	spin_unlock_irqrestore(&gpio_lock, flags);
+	if (status)
+		pr_debug("%s: gpio-%d status %d\n",
+			__func__, gpio, status);
+
+	return status;
+}
+EXPORT_SYMBOL(gpio_set_current);
+
+int gpio_get_current(unsigned gpio)
+{
+	unsigned long		flags;
+	struct gpio_chip	*chip;
+	struct gpio_desc	*desc;
+	int			status = -EINVAL;
+
+	gpio = gpio_to_phys(gpio);
+	desc = &gpio_desc[gpio];
+
+	spin_lock_irqsave(&gpio_lock, flags);
+
+	if (!gpio_is_valid(gpio))
+		goto fail;
+	chip = desc->chip;
+	if (!chip || !chip->set || !chip->get_current)
+		goto fail;
+	gpio -= chip->base;
+	if (gpio >= chip->ngpio)
+		goto fail;
+	status = gpio_ensure_requested(desc, gpio);
+	if (status < 0)
+		goto fail;
+
+	/* now we know the gpio is valid and chip won't vanish */
+	
+	spin_unlock_irqrestore(&gpio_lock, flags);
+
+	might_sleep_if(chip->can_sleep);
+
+	return chip->get_current(chip, gpio);
+
+fail:
+	spin_unlock_irqrestore(&gpio_lock, flags);
+	if (status)
+		pr_debug("%s: gpio-%d status %d\n",
+			__func__, gpio, status);
+
+	return status;
+}
+EXPORT_SYMBOL(gpio_get_current);
+
+int gpio_set_function(unsigned gpio, unsigned value)
+{
+	unsigned long		flags;
+	struct gpio_chip	*chip;
+	struct gpio_desc	*desc;
+	int			status = -EINVAL;
+
+	gpio = gpio_to_phys(gpio);
+	desc = &gpio_desc[gpio];
+
+	spin_lock_irqsave(&gpio_lock, flags);
+
+	if (!gpio_is_valid(gpio))
+		goto fail;
+	chip = desc->chip;
+	if (!chip || !chip->set || !chip->set_function)
+		goto fail;
+	gpio -= chip->base;
+	if (gpio >= chip->ngpio)
+		goto fail;
+	status = gpio_ensure_requested(desc, gpio);
+	if (status < 0)
+		goto fail;
+
+	/* now we know the gpio is valid and chip won't vanish */
+	
+	spin_unlock_irqrestore(&gpio_lock, flags);
+
+	might_sleep_if(chip->can_sleep);
+
+	return chip->set_function(chip, gpio, value);
+
+fail:
+	spin_unlock_irqrestore(&gpio_lock, flags);
+	if (status)
+		pr_debug("%s: gpio-%d status %d\n",
+			__func__, gpio, status);
+
+	return status;
+}
+EXPORT_SYMBOL(gpio_set_function);
+
+int gpio_get_function(unsigned gpio)
+{
+	unsigned long		flags;
+	struct gpio_chip	*chip;
+	struct gpio_desc	*desc;
+	int			status = -EINVAL;
+
+	gpio = gpio_to_phys(gpio);
+	desc = &gpio_desc[gpio];
+
+	spin_lock_irqsave(&gpio_lock, flags);
+
+	if (!gpio_is_valid(gpio))
+		goto fail;
+	chip = desc->chip;
+	if (!chip || !chip->set || !chip->get_function)
+		goto fail;
+	gpio -= chip->base;
+	if (gpio >= chip->ngpio)
+		goto fail;
+	status = gpio_ensure_requested(desc, gpio);
+	if (status < 0)
+		goto fail;
+
+	/* now we know the gpio is valid and chip won't vanish */
+	
+	spin_unlock_irqrestore(&gpio_lock, flags);
+
+	might_sleep_if(chip->can_sleep);
+
+	return chip->get_function(chip, gpio);
+
+fail:
+	spin_unlock_irqrestore(&gpio_lock, flags);
+	if (status)
+		pr_debug("%s: gpio-%d status %d\n",
+			__func__, gpio, status);
+
+	return status;
+}
+EXPORT_SYMBOL(gpio_get_function);
 
 /* I/O calls are only valid after configuration completed; the relevant
  * "is this a valid GPIO" error checks should already have been done.
@@ -1584,6 +2240,7 @@ int __gpio_get_value(unsigned gpio)
 	struct gpio_chip	*chip;
 	int value;
 
+	gpio = gpio_to_phys(gpio);
 	chip = gpio_to_chip(gpio);
 	/* Should be using gpio_get_value_cansleep() */
 	WARN_ON(chip->can_sleep);
@@ -1657,6 +2314,7 @@ void __gpio_set_value(unsigned gpio, int value)
 {
 	struct gpio_chip	*chip;
 
+	gpio = gpio_to_phys(gpio);
 	chip = gpio_to_chip(gpio);
 	/* Should be using gpio_set_value_cansleep() */
 	WARN_ON(chip->can_sleep);
@@ -1683,6 +2341,7 @@ int __gpio_cansleep(unsigned gpio)
 	struct gpio_chip	*chip;
 
 	/* only call this on GPIOs that are valid! */
+	gpio = gpio_to_phys(gpio);
 	chip = gpio_to_chip(gpio);
 
 	return chip->can_sleep;
@@ -1702,6 +2361,7 @@ int __gpio_to_irq(unsigned gpio)
 {
 	struct gpio_chip	*chip;
 
+	gpio = gpio_to_phys(gpio);
 	chip = gpio_to_chip(gpio);
 	return chip->to_irq ? chip->to_irq(chip, gpio - chip->base) : -ENXIO;
 }
@@ -1719,6 +2379,7 @@ int gpio_get_value_cansleep(unsigned gpio)
 	int value;
 
 	might_sleep_if(extra_checks);
+	gpio = gpio_to_phys(gpio);
 	chip = gpio_to_chip(gpio);
 	value = chip->get ? chip->get(chip, gpio - chip->base) : 0;
 	trace_gpio_value(gpio, 1, value);
@@ -1731,6 +2392,7 @@ void gpio_set_value_cansleep(unsigned gpio, int value)
 	struct gpio_chip	*chip;
 
 	might_sleep_if(extra_checks);
+	gpio = gpio_to_phys(gpio);
 	chip = gpio_to_chip(gpio);
 	trace_gpio_value(gpio, 0, value);
 	if (test_bit(FLAG_OPEN_DRAIN,  &gpio_desc[gpio].flags))
@@ -1829,3 +2491,5 @@ static int __init gpiolib_debugfs_init(void)
 subsys_initcall(gpiolib_debugfs_init);
 
 #endif	/* DEBUG_FS */
+
+module_init(gpio_ioctl_init);

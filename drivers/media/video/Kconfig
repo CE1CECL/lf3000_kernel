@@ -87,6 +87,18 @@ config  VIDEOBUF2_ION
 	  Internal memory management for Video Buffer 2 by ION
 endchoice
 
+config VIDEOBUF2_ION_NXP
+    bool "Video Buffer2 ION helper for NXP"
+    depends on ION_NXP
+    select VIDEOBUF2_CORE
+    select VIDEOBUF2_MEMOPS
+    help
+      Internal memory management for Video Buffer2 by ION
+
+source "drivers/media/video/nexell/Kconfig"
+
+source "drivers/media/video/lf2000/Kconfig"
+
 #
 # Multimedia Video device configuration
 #
@@ -549,6 +561,15 @@ config VIDEO_MT9V032
 	  This is a Video4Linux2 sensor-level driver for the Micron
 	  MT9V032 752x480 CMOS sensor.
 
+config VIDEO_MT9D111_CAM
+    tristate "Micron MT9D111 sensor support(nexell work)"
+    depends on I2C && VIDEO_V4L2
+    ---help---
+	  This is a Video4Linux2 sensor-level driver for the Micron
+	  MT9D111 1600x1200 CMOS sensor.
+
+source "drivers/media/video/thine/Kconfig"
+	  
 config VIDEO_TCM825X
 	tristate "TCM825x camera sensor support"
 	depends on I2C && VIDEO_V4L2
@@ -567,6 +588,73 @@ config VIDEO_NOON010PC30
 	depends on I2C && VIDEO_V4L2 && EXPERIMENTAL && VIDEO_V4L2_SUBDEV_API
 	---help---
 	  This driver supports NOON010PC30 CIF camera from Siliconfile
+
+config VIDEO_S5K4ECGX
+    tristate "S5K4ECGX 5M pixel camera sensor support"
+    depends on I2C && VIDEO_V4L2
+    ---help---
+      This driver supports s5k4ecgx Soc camera module
+
+config VIDEO_S5K4ECGX_DEBUG
+    bool "S5K4ECGX camera sensor debugging"
+    depends on VIDEO_S5K4ECGX
+    default n
+    ---help---
+      Enable extra debug messages for S5K4ECGX camera driver
+
+config VIDEO_S5K5CAGX
+    tristate "S5K5CAGX 3M pixel camera sensor support"
+    depends on I2C && VIDEO_V4L2
+    ---help---
+      This driver supports s5k5cagx SoC camera module.
+
+config VIDEO_SP2518
+    tristate "SP2518 2M pixel camera sensor support"
+    depends on I2C && VIDEO_V4L2
+    ---help---
+      This driver supports SuperPix SP2518 SoC camera module.
+
+config VIDEO_SP2518_FIXED_FRAMERATE
+    bool "use fixed framerate"
+    depends on VIDEO_SP2518
+    ---help---
+      if this option on, framerate is fixed 30frame, else variable 8-12frame
+
+config VIDEO_GC2035
+    tristate "GC2035 2M pixel camera sensor support"
+    depends on I2C && VIDEO_V4L2
+    ---help---
+      This driver supports GC2035 SoC camera module.
+
+config VIDEO_GC0308
+    tristate "GC0308 0.3M pixel camera sensor support"
+    depends on I2C && VIDEO_V4L2
+    ---help---
+      This driver supports GC0308 SoC camera module.
+
+config VIDEO_HM2057
+    tristate "HM2057 2M pixel camera sensor support"
+    depends on I2C && VIDEO_V4L2
+    ---help---
+      This driver supports HM2057 SoC camera module.
+
+config VIDEO_SP0A19
+    tristate "SP0A19 0.3M pixel camera sensor support"
+    depends on I2C && VIDEO_V4L2
+    ---help---
+      This driver supports SuperPix SP0A19 SoC camera module.
+
+config VIDEO_SP0838
+    tristate "SP0838 0.3M pixel camera sensor support"
+    depends on I2C && VIDEO_V4L2
+    ---help---
+      This driver supports SuperPix SP0838 SoC camera module.
+
+config VIDEO_SP0838_FIXED_FRAMERATE
+    bool "use fixed framerate"
+    depends on VIDEO_SP0838
+    ---help---
+      if this option on, framerate is fixed 15frame, else variable 8-10frame
 
 config VIDEO_S5K4E5
         tristate "S5K4E5 sensor support"
@@ -709,6 +797,30 @@ config VIDEO_S5K6AA
 	---help---
 	  This is a V4L2 sensor-level driver for Samsung S5K6AA(FX) 1.3M
 	  camera sensor with an embedded SoC image signal processor.
+
+config VIDEO_HI253
+    tristate "Hynix HI253 2M pixel camera sensor support"
+    depends on I2C && VIDEO_V4L2
+    ---help---
+      This driver supports Hynix HI253 SoC camera module for V4L2 Media API.
+      
+config VIDEO_HI257
+    tristate "Hynix HI257 2M pixel camera sensor support"
+    depends on I2C && VIDEO_V4L2
+    ---help---
+      This driver supports Hynix HI257 SoC camera module for V4L2 Media API.
+
+config VIDEO_HM2056
+    tristate "Himax HM2056 2M pixel camera sensor support"
+    depends on I2C && VIDEO_V4L2
+    ---help---
+      This driver supports Himax HM2056 SoC camera module for V4L2 Media API.
+
+config VIDEO_HI253_HM2056
+    tristate "both HI253 HM2056 camera sensor support"
+    depends on I2C && VIDEO_V4L2
+    ---help---
+      This driver supports both camera module for V4L2 Media API.
 
 comment "Flash devices"
 
@@ -1210,6 +1322,12 @@ config SOC_CAMERA_OV9740
 	depends on SOC_CAMERA && I2C
 	help
 	  This is a ov9740 camera driver
+
+config SOC_CAMERA_HI253
+	tristate "hi253 camera support"
+	depends on SOC_CAMERA && I2C
+	help
+	  This is a V4L2 SoC camera driver for Hynix HI253 2MP sensors
 
 config MX1_VIDEO
 	bool

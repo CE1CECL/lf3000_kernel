@@ -504,6 +504,19 @@ config SENSORS_JC42
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called jc42.
+	  
+config SENSORS_LF3000
+	boolean "LF3000 Hardware Monitoring"
+	depends on ARCH_NXP4330
+	help
+	  If you say yes here you get support for the LF3000 battery
+          and power monitoring.
+          
+config SENSORS_GLASGOW
+	boolean "Glasgow Hardware Monitoring"
+	depends on ARCH_NXP4330
+	help
+	  If you say yes here you get support for the Glasgow power monitoring.
 
 config SENSORS_LINEAGE
 	tristate "Lineage Compact Power Line Power Entry Module"
@@ -1376,6 +1389,47 @@ config SENSORS_MC13783_ADC
         help
           Support for the A/D converter on MC13783 and MC13892 PMIC.
 
+config SENSORS_MMA7660
+	tristate "Freescale MMA7660FC 3-Axis Accelerometer"
+	depends on I2C
+	default n
+	help
+		Say Y here to enable the accelerometer.
+
+		If unsure, say N.
+
+config SENSORS_MMA865X
+	tristate "Freescale MMA865X 3-Axis Accelerometer"
+	depends on I2C
+	default n
+	help
+		Say Y here to enable the accelerometer.
+
+		If unsure, say N.
+
+config SENSORS_STK831X
+	tristate "Lex Hsieh / Sensortek STK831X 3-Axis Accelerometer"
+	depends on I2C
+	default n
+	help
+		Say Y here to enable the accelerometer.
+		If unsure, say N.
+
+choice
+	prompt "Select STK831X"
+	depends on SENSORS_STK831X
+	default SENSORS_STK8312
+
+config	SENSORS_STK8312
+	bool "Sensor STK8312"
+
+config	SENSORS_STK8313
+	bool "Sensor STK8313"
+
+endchoice
+
+source drivers/hwmon/bosch/Kconfig
+
 if ACPI
 
 comment "ACPI drivers"
@@ -1403,5 +1457,12 @@ config SENSORS_ATK0110
 	  will be called asus_atk0110.
 
 endif # ACPI
+
+config SENSORS_BMA222E_NX
+	tristate "BOSCH BMA222E 3-Axis Accelerometer(Nexell work)"
+	depends on I2C
+	default n
+	help
+		Say Y here to enable the accelerometer.
 
 endif # HWMON

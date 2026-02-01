@@ -2,6 +2,7 @@
 # Makefile for misc devices that really don't fit anywhere else.
 #
 
+obj-$(CONFIG_HAPTIC_DRV260X)	+= haptic/
 obj-$(CONFIG_IBM_ASM)		+= ibmasm/
 obj-$(CONFIG_AD525X_DPOT)	+= ad525x_dpot.o
 obj-$(CONFIG_AD525X_DPOT_I2C)	+= ad525x_dpot-i2c.o
@@ -56,3 +57,4 @@ obj-$(CONFIG_WL127X_RFKILL)	+= wl127x-rfkill.o
 obj-$(CONFIG_SENSORS_AK8975)	+= akm8975.o
 obj-$(CONFIG_STMPE811_ADC)	+= stmpe811-adc.o
 obj-$(CONFIG_AUDIENCE_ES305)	+= es305.o
+obj-$(CONFIG_NXP4330_BACKWARD_CAMERA) += backward-camera.o

@@ -83,6 +83,18 @@
 
 #define JEDEC_MFR(_jedec_id)	((_jedec_id) >> 16)
 
+#ifdef CONFIG_NXP4330_LEAPFROG
+/******************************************************************************/
+
+/* Protect NOR from accidental erasure:
+ * Create an address threshold; addresses LOWER than this address are
+ *   blocked from erase or write commands to the nor (will return -EPERM).
+ * By default, set the threshold up high, to protect everything in NOR
+ */
+extern u32 nor_write_addr_threshold;
+
+#endif
+
 /****************************************************************************/
 
 struct m25p {
@@ -212,6 +224,13 @@ static int erase_chip(struct m25p *flash)
 	pr_debug("%s: %s %lldKiB\n", dev_name(&flash->spi->dev), __func__,
 			(long long)(flash->mtd.size >> 10));
 
+#ifdef CONFIG_NXP4330_LEAPFROG
+	/* Protect NOR from accidental erasure: addresses LOWER than
+	   this fail*/
+	if (((long long)flash->mtd.size >> 10) < nor_write_addr_threshold)
+		return -EPERM;
+#endif
+
 	/* Wait until finished previous write command. */
 	if (wait_till_ready(flash))
 		return 1;
@@ -252,6 +271,13 @@ static int erase_sector(struct m25p *flash, u32 offset)
 	pr_debug("%s: %s %dKiB at 0x%08x\n", dev_name(&flash->spi->dev),
 			__func__, flash->mtd.erasesize / 1024, offset);
 
+#ifdef CONFIG_NXP4330_LEAPFROG
+	/* Protect NOR from accidental erasure: addresses LOWER than this fail.
+	 * Conservatively expect threshold to be at least one sector higher. */
+	if ((offset + flash->mtd.erasesize) < nor_write_addr_threshold)
+		return -EPERM;
+#endif
+
 	/* Wait until finished previous write command. */
 	if (wait_till_ready(flash))
 		return 1;
@@ -287,6 +313,13 @@ static int m25p80_erase(struct mtd_info *mtd, struct erase_info *instr)
 	pr_debug("%s: %s at 0x%llx, len %lld\n", dev_name(&flash->spi->dev),
 			__func__, (long long)instr->addr,
 			(long long)instr->len);
+
+#ifdef CONFIG_NXP4330_LEAPFROG
+	/* Protect NOR from accidental erasure: addresses LOWER than
+	   this fail*/
+	if (instr->addr < nor_write_addr_threshold)
+		return -EPERM;
+#endif
 
 	div_u64_rem(instr->len, mtd->erasesize, &rem);
 	if (rem)
@@ -404,6 +437,13 @@ static int m25p80_write(struct mtd_info *mtd, loff_t to, size_t len,
 	pr_debug("%s: %s to 0x%08x, len %zd\n", dev_name(&flash->spi->dev),
 			__func__, (u32)to, len);
 
+#ifdef CONFIG_NXP4330_LEAPFROG
+	/* Protect NOR from accidental erasure/writes: addresses
+	   LOWER than this fail*/
+	if (to < nor_write_addr_threshold)
+		return -EPERM;
+#endif
+
 	spi_message_init(&m);
 	memset(t, 0, (sizeof t));
 
@@ -486,6 +526,13 @@ static int sst_write(struct mtd_info *mtd, loff_t to, size_t len,
 
 	pr_debug("%s: %s to 0x%08x, len %zd\n", dev_name(&flash->spi->dev),
 			__func__, (u32)to, len);
+
+#ifdef CONFIG_NXP4330_LEAPFROG
+	/* Protect NOR from accidental erasure/writes: addresses
+	   LOWER than this fail*/
+	if (to < nor_write_addr_threshold)
+		return -EPERM;
+#endif
 
 	spi_message_init(&m);
 	memset(t, 0, (sizeof t));
@@ -645,8 +692,8 @@ static const struct spi_device_id m25p_ids[] = {
 	{ "640s33b",  INFO(0x898913, 0, 64 * 1024, 128, 0) },
 
 	/* Macronix */
-	{ "mx25l4005a",  INFO(0xc22013, 0, 64 * 1024,   8, SECT_4K) },
-	{ "mx25l8005",   INFO(0xc22014, 0, 64 * 1024,  16, 0) },
+	{ "mx25l4006e",  INFO(0xc22013, 0, 64 * 1024,   8, SECT_4K) },
+	{ "mx25l8005",   INFO(0xc22014, 0, 64 * 1024,  16, SECT_4K) },
 	{ "mx25l1606e",  INFO(0xc22015, 0, 64 * 1024,  32, SECT_4K) },
 	{ "mx25l3205d",  INFO(0xc22016, 0, 64 * 1024,  64, 0) },
 	{ "mx25l6405d",  INFO(0xc22017, 0, 64 * 1024, 128, 0) },
@@ -712,6 +759,7 @@ static const struct spi_device_id m25p_ids[] = {
 
 	{ "m25pe80", INFO(0x208014,  0, 64 * 1024, 16,       0) },
 	{ "m25pe16", INFO(0x208015,  0, 64 * 1024, 32, SECT_4K) },
+	{ "m25pe40", INFO(0x208013,  0, 64 * 1024,  8, SECT_4K) },
 
 	{ "m25px32",    INFO(0x207116,  0, 64 * 1024, 64, SECT_4K) },
 	{ "m25px32-s0", INFO(0x207316,  0, 64 * 1024, 64, SECT_4K) },
@@ -728,6 +776,8 @@ static const struct spi_device_id m25p_ids[] = {
 	{ "w25q32", INFO(0xef4016, 0, 64 * 1024,  64, SECT_4K) },
 	{ "w25x64", INFO(0xef3017, 0, 64 * 1024, 128, SECT_4K) },
 	{ "w25q64", INFO(0xef4017, 0, 64 * 1024, 128, SECT_4K) },
+	{ "w25x40cl", INFO(0x123013, 0, 64 * 1024,  8,  SECT_4K) },
+	{ "w25q128",  INFO(0xef4018, 0, 128 * 1024, 256, SECT_4K) },
 
 	/* Catalyst / On Semiconductor -- non-JEDEC */
 	{ "cat25c11", CAT25_INFO(  16, 8, 16, 1) },
@@ -735,6 +785,9 @@ static const struct spi_device_id m25p_ids[] = {
 	{ "cat25c09", CAT25_INFO( 128, 8, 32, 2) },
 	{ "cat25c17", CAT25_INFO( 256, 8, 32, 2) },
 	{ "cat25128", CAT25_INFO(2048, 8, 64, 2) },
+	
+	/* PFlash */
+	{ "pm25ld040", INFO(0x7f9d7e, 0, 64 * 1024, 8, SECT_4K) },
 	{ },
 };
 MODULE_DEVICE_TABLE(spi, m25p_ids);
