@@ -257,6 +257,7 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
 	 * switch away from it before attempting any exclusive accesses.
 	 */
 	cpu_switch_mm(mm->pgd, mm);
+	local_flush_bp_all();
 	enter_lazy_tlb(mm, current);
 	local_flush_tlb_all();
 
@@ -674,4 +675,14 @@ void smp_send_stop(void)
 int setup_profiling_timer(unsigned int multiplier)
 {
 	return -EINVAL;
+}
+
+static void flush_all_cpu_cache(void *info)
+{
+	flush_cache_all();
+}
+
+void flush_all_cpu_caches(void)
+{
+	on_each_cpu(flush_all_cpu_cache, NULL, 1);
 }
