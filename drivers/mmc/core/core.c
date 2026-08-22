@@ -348,8 +348,12 @@ struct mmc_async_req *mmc_start_req(struct mmc_host *host,
 	struct mmc_async_req *data = host->areq;
 
 	/* Prepare a new request */
-	if (areq)
+	if (areq && !areq->__cond) {
 		mmc_pre_req(host, areq->mrq, !host->areq);
+		if (areq->__mrq) {
+			mmc_pre_req(host, areq->__mrq, 0);
+		}
+	}
 
 	if (host->areq) {
 		mmc_wait_for_req_done(host, host->areq->mrq);
@@ -363,8 +367,11 @@ struct mmc_async_req *mmc_start_req(struct mmc_host *host,
 		mmc_post_req(host, host->areq->mrq, 0);
 
 	 /* Cancel a prepared request if it was not started. */
-	if ((err || start_err) && areq)
-			mmc_post_req(host, areq->mrq, -EINVAL);
+	if ((err || start_err) && areq) {
+		mmc_post_req(host, areq->mrq, -EINVAL);
+		if (areq->__mrq)
+			mmc_post_req(host, areq->__mrq, -EINVAL);
+	}
 
 	if (err)
 		host->areq = NULL;
@@ -1050,6 +1057,13 @@ int mmc_set_signal_voltage(struct mmc_host *host, int signal_voltage, bool cmd11
 	int err = 0;
 
 	BUG_ON(!host);
+
+	/* Some devices use only dedicated specific signaling level for
+	 * design reasons. MMC_CAP2_BROKEN_VOLTAGE flag is used when
+	 * there is no needs to change to any signaling level.
+	 */
+	if (host->caps2 & MMC_CAP2_BROKEN_VOLTAGE)
+		return 0;
 
 	/*
 	 * Send CMD11 only if the request is to switch the card to
