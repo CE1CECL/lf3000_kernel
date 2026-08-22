@@ -40,7 +40,19 @@
 #include <linux/dma-mapping.h>
 #include <linux/scatterlist.h>
 #include <linux/pm_runtime.h>
+#include <mach/soc.h>
+#include <mach/platform.h>
+#include <mach/devices.h>
 
+
+//#define dev_dbg(f,m...)	printk(m)
+#define SPI0_PRESET	RESET_ID_SSP0_P
+#define SPI0_nRESET	RESET_ID_SSP0
+const int reset[3][2] = {
+	{RESET_ID_SSP0_P,RESET_ID_SSP0} ,
+	{RESET_ID_SSP1_P,RESET_ID_SSP1} ,
+	{RESET_ID_SSP2_P,RESET_ID_SSP2} ,
+};
 /*
  * This macro is used to define some register default values.
  * reg is masked with mask, the OR:ed with an (again masked)
@@ -104,7 +116,7 @@
 #define SSP_CR0_MASK_SCR	(0xFFUL << 8)
 
 /*
- * The ST version of this block moves som bits
+ * The ST version of this block moves some bits
  * in SSP_CR0 and extends it to 32 bits
  */
 #define SSP_CR0_MASK_DSS_ST	(0x1FUL << 0)
@@ -477,6 +489,11 @@ static void giveback(struct pl022 *pl022)
 		 * to the same spi device.
 		 */
 		if (next_msg && next_msg->spi != pl022->cur_msg->spi)
+
+	/* disable the SPI/SSP operation */
+	writew((readw(SSP_CR1(pl022->virtbase)) &
+		(~SSP_CR1_MASK_SSE)), SSP_CR1(pl022->virtbase));
+
 			next_msg = NULL;
 		if (!next_msg || pl022->cur_msg->state == STATE_ERROR)
 			pl022->cur_chip->cs_control(SSP_CHIP_DESELECT);
@@ -489,6 +506,9 @@ static void giveback(struct pl022 *pl022)
 	pl022->cur_transfer = NULL;
 	pl022->cur_chip = NULL;
 	spi_finalize_current_message(pl022->master);
+	/* disable the SPI/SSP operation */
+	writew((readw(SSP_CR1(pl022->virtbase)) &
+		(~SSP_CR1_MASK_SSE)), SSP_CR1(pl022->virtbase));
 }
 
 /**
@@ -620,6 +640,36 @@ static void load_ssp_default_config(struct pl022 *pl022)
 	writew(DEFAULT_SSP_REG_CPSR, SSP_CPSR(pl022->virtbase));
 	writew(DISABLE_ALL_INTERRUPTS, SSP_IMSC(pl022->virtbase));
 	writew(CLEAR_ALL_INTERRUPTS, SSP_ICR(pl022->virtbase));
+}
+/**
+ * This dumps the registers for debugging
+ **/
+void dump_ssp_registers(struct pl022 *pl022)
+{
+	printk(KERN_INFO "%s.%s.%d: Registers pl022->virtbase:0x%p\n",
+			__FILE__, __FUNCTION__, __LINE__, pl022->virtbase);
+	printk(KERN_INFO "     CR0.0x%p:0x%4.4X\n",   SSP_CR0(pl022->virtbase),   readw(SSP_CR0(pl022->virtbase)));
+	printk(KERN_INFO "     CR1.0x%p:0x%4.4X\n",   SSP_CR1(pl022->virtbase),   readw(SSP_CR1(pl022->virtbase)));
+	printk(KERN_INFO "      DR.0x%p:0x%4.4X\n",    SSP_DR(pl022->virtbase),    readw(SSP_DR(pl022->virtbase)));
+	printk(KERN_INFO "      SR.0x%p:0x%4.4X\n",    SSP_SR(pl022->virtbase),    readw(SSP_SR(pl022->virtbase)));
+	printk(KERN_INFO "    CPSR.0x%p:0x%4.4X\n",  SSP_CPSR(pl022->virtbase),  readw(SSP_CPSR(pl022->virtbase)));
+	printk(KERN_INFO "    IMSC.0x%p:0x%4.4X\n",  SSP_IMSC(pl022->virtbase),  readw(SSP_IMSC(pl022->virtbase)));
+	printk(KERN_INFO "     RIS.0x%p:0x%4.4X\n",   SSP_RIS(pl022->virtbase),   readw(SSP_RIS(pl022->virtbase)));
+	printk(KERN_INFO "     MIS.0x%p:0x%4.4X\n",   SSP_MIS(pl022->virtbase),   readw(SSP_MIS(pl022->virtbase)));
+	printk(KERN_INFO "     ICR.0x%p:0x%4.4X\n",   SSP_ICR(pl022->virtbase),   readw(SSP_ICR(pl022->virtbase)));
+	printk(KERN_INFO "   DMACR.0x%p:0x%4.4X\n", SSP_DMACR(pl022->virtbase), readw(SSP_DMACR(pl022->virtbase)));
+	printk(KERN_INFO "    ITCR.0x%p:0x%4.4X\n",  SSP_ITCR(pl022->virtbase),  readw(SSP_ITCR(pl022->virtbase)));
+	printk(KERN_INFO "    ITIP.0x%p:0x%4.4X\n",  SSP_ITIP(pl022->virtbase),  readw(SSP_ITIP(pl022->virtbase)));
+	printk(KERN_INFO "    ITOP.0x%p:0x%4.4X\n",  SSP_ITOP(pl022->virtbase),  readw(SSP_ITOP(pl022->virtbase)));
+	printk(KERN_INFO "     TDR.0x%p:0x%4.4X\n",   SSP_TDR(pl022->virtbase),   readw(SSP_TDR(pl022->virtbase)));
+	printk(KERN_INFO "    PID0.0x%p:0x%4.4X\n",  SSP_PID0(pl022->virtbase),  readw(SSP_PID0(pl022->virtbase)));
+	printk(KERN_INFO "    PID1.0x%p:0x%4.4X\n",  SSP_PID1(pl022->virtbase),  readw(SSP_PID1(pl022->virtbase)));
+	printk(KERN_INFO "    PID2.0x%p:0x%4.4X\n",  SSP_PID2(pl022->virtbase),  readw(SSP_PID2(pl022->virtbase)));
+	printk(KERN_INFO "    PID3.0x%p:0x%4.4X\n",  SSP_PID3(pl022->virtbase),  readw(SSP_PID3(pl022->virtbase)));
+	printk(KERN_INFO "    CID0.0x%p:0x%4.4X\n",  SSP_CID0(pl022->virtbase),  readw(SSP_CID0(pl022->virtbase)));
+	printk(KERN_INFO "    CID1.0x%p:0x%4.4X\n",  SSP_CID1(pl022->virtbase),  readw(SSP_CID1(pl022->virtbase)));
+	printk(KERN_INFO "    CID2.0x%p:0x%4.4X\n",  SSP_CID2(pl022->virtbase),  readw(SSP_CID2(pl022->virtbase)));
+	printk(KERN_INFO "    CID3.0x%p:0x%4.4X\n",  SSP_CID3(pl022->virtbase),  readw(SSP_CID3(pl022->virtbase)));
 }
 
 /**
@@ -1003,10 +1053,11 @@ static int configure_dma(struct pl022 *pl022)
 
 	/* Fill in the scatterlists for the RX+TX buffers */
 	setup_dma_scatter(pl022, pl022->rx,
-			  pl022->cur_transfer->len, &pl022->sgt_rx);
+		  pl022->cur_transfer->len, &pl022->sgt_rx);
+	msleep(1);
 	setup_dma_scatter(pl022, pl022->tx,
-			  pl022->cur_transfer->len, &pl022->sgt_tx);
-
+		  pl022->cur_transfer->len, &pl022->sgt_tx);
+	msleep(1);
 	/* Map DMA buffers */
 	rx_sglen = dma_map_sg(rxchan->device->dev, pl022->sgt_rx.sgl,
 			   pl022->sgt_rx.nents, DMA_FROM_DEVICE);
@@ -1382,7 +1433,9 @@ static void do_interrupt_dma_transfer(struct pl022 *pl022)
 		return;
 	}
 	/* If we're using DMA, set up DMA here */
-	if (pl022->cur_chip->enable_dma) {
+
+	if (pl022->cur_chip->enable_dma && pl022->cur_transfer->len >= 4 ) {
+//	if (pl022->cur_chip->enable_dma) {
 		/* Configure DMA transfer */
 		if (configure_dma(pl022)) {
 			dev_dbg(&pl022->adev->dev,
@@ -1397,6 +1450,7 @@ err_config_dma:
 	writew((readw(SSP_CR1(pl022->virtbase)) | SSP_CR1_MASK_SSE),
 	       SSP_CR1(pl022->virtbase));
 	writew(irqflags, SSP_IMSC(pl022->virtbase));
+
 }
 
 static void do_polling_transfer(struct pl022 *pl022)
@@ -1409,6 +1463,8 @@ static void do_polling_transfer(struct pl022 *pl022)
 
 	chip = pl022->cur_chip;
 	message = pl022->cur_msg;
+
+	//dump_ssp_registers(pl022); //FIXME: just for debugging
 
 	while (message->state != STATE_DONE) {
 		/* Handle for abort */
@@ -1662,6 +1718,7 @@ static int calculate_effective_freq(struct pl022 *pl022, int freq, struct
 		best_scr = 0, tmp, found = 0;
 
 	rate = clk_get_rate(pl022->clk);
+
 	/* cpsdvscr = 2 & scr 0 */
 	max_tclk = spi_rate(rate, CPSDVR_MIN, SCR_MIN);
 	/* cpsdvsr = 254 & scr = 255 */
@@ -1723,6 +1780,7 @@ static int calculate_effective_freq(struct pl022 *pl022, int freq, struct
 	dev_dbg(&pl022->adev->dev,
 		"SSP Target Frequency is: %u, Effective Frequency is %u\n",
 		freq, best_freq);
+
 	dev_dbg(&pl022->adev->dev, "SSP cpsdvsr = %d, scr = %d\n",
 		clk_freq->cpsdvsr, clk_freq->scr);
 
@@ -1990,6 +2048,8 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
 	struct pl022 *pl022 = NULL;	/*Data for this driver */
 	int status = 0;
 
+	char name[10];
+
 	dev_info(&adev->dev,
 		 "ARM PL022 driver, device ID: 0x%08x\n", adev->periphid);
 	if (platform_info == NULL) {
@@ -2047,8 +2107,12 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
 	}
 	printk(KERN_INFO "pl022: mapped registers from 0x%08x to %p\n",
 	       adev->res.start, pl022->virtbase);
-
+	
+	sprintf(name,"nxp-spi.%d",(unsigned char)master->bus_num);
 	pl022->clk = clk_get(&adev->dev, NULL);
+	
+	pl022->clk = clk_get(NULL, name);
+	clk_set_rate(pl022->clk,100000000);
 	if (IS_ERR(pl022->clk)) {
 		status = PTR_ERR(pl022->clk);
 		dev_err(&adev->dev, "could not retrieve SSP/SPI bus clock\n");
@@ -2067,6 +2131,13 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
 		goto err_no_clk_en;
 	}
 
+
+	nxp_soc_rsc_enter(reset[ master->bus_num][0]);
+	nxp_soc_rsc_enter(reset[ master->bus_num][1]);
+	udelay(10);
+	nxp_soc_rsc_exit(reset[ master->bus_num][0]);	
+	nxp_soc_rsc_exit(reset[ master->bus_num][1]);	
+
 	/* Initialize transfer pump */
 	tasklet_init(&pl022->pump_transfers, pump_transfers,
 		     (unsigned long)pl022);
@@ -2075,7 +2146,6 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
 	writew((readw(SSP_CR1(pl022->virtbase)) & (~SSP_CR1_MASK_SSE)),
 	       SSP_CR1(pl022->virtbase));
 	load_ssp_default_config(pl022);
-
 	status = request_irq(adev->irq[0], pl022_interrupt_handler, 0, "pl022",
 			     pl022);
 	if (status < 0) {
@@ -2086,6 +2156,7 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
 	/* Get DMA channels */
 	if (platform_info->enable_dma) {
 		status = pl022_dma_probe(pl022);
+
 		if (status != 0)
 			platform_info->enable_dma = 0;
 	}
@@ -2095,7 +2166,7 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
 	status = spi_register_master(master);
 	if (status != 0) {
 		dev_err(&adev->dev,
-			"probe - problem registering spi master\n");
+			"probe - problem registering spi master %d \n", status);
 		goto err_spi_register;
 	}
 	dev_dbg(dev, "probe succeeded\n");

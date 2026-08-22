@@ -1,0 +1,11 @@
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = false
+	logallrefupdates = true
+[remote "origin"]
+	fetch = +refs/heads/*:refs/remotes/origin/*
+	url = /home/lfbuilder/Angstrom/downloads/git2/stash.leapfrog.com.7999.nxp.linux-3.4.24.git/
+[branch "develop"]
+	remote = origin
+	merge = refs/heads/develop

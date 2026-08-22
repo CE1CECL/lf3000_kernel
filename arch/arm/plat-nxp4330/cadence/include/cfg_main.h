@@ -1,0 +1,236 @@
+/*------------------------------------------------------------------------------
+ *
+ *	Copyright (C) 2009 Nexell Co., Ltd All Rights Reserved
+ *	Nexell Co. Proprietary & Confidential
+ *
+ *	NEXELL INFORMS THAT THIS CODE AND INFORMATION IS PROVIDED "AS IS" BASE
+ *  AND	WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING
+ *  BUT NOT LIMITED TO THE IMPLIED WARRANTIES OF MERCHANTABILITY AND/OR FITNESS
+ *  FOR A PARTICULAR PURPOSE.
+ *
+ *	Module     : System memory config
+ *	Description:
+ *	Author     : Platform Team
+ *	Export     :
+ *	History    :
+ *	   2009/05/13 first implementation
+ ------------------------------------------------------------------------------*/
+#ifndef __CFG_MAIN_H__
+#define __CFG_MAIN_H__
+
+#include <cfg_sys.h>
+
+/*------------------------------------------------------------------------------
+ * 	System Name
+ */
+#define	CFG_SYS_CPU_NAME						"nxp4330q"
+#define	CFG_SYS_BOARD_NAME						"nxp4330-cadence"
+
+/*------------------------------------------------------------------------------
+ * 	Uart
+ */
+#define CFG_UART_DEBUG_CH						0	/* For Low level debug */
+#define	CFG_UART_DEBUG_BAUDRATE					115200
+#define	CFG_UART_CLKGEN_CLOCK_HZ				14750000	/* 50000000 */
+
+/*------------------------------------------------------------------------------
+ * 	Timer List (SYS = Source, EVT = Event, WDT = WatchDog)
+ */
+#define	CFG_TIMER_SYS_TICK_CH					0
+#define	CFG_TIMER_EVT_TICK_CH					1
+
+/*------------------------------------------------------------------------------
+ * 	Extern Ethernet
+ */
+#define CFG_ETHER_EXT_PHY_BASEADDR          	0x04000000	// DM9000: CS1
+#define	CFG_ETHER_EXT_IRQ_NUM					(IRQ_GPIO_C_START + 26)
+
+/*------------------------------------------------------------------------------
+ * 	Nand
+ */
+
+/*------------------------------------------------------------------------------
+ * 	Display (DPC and MLC)
+ */
+/* Primary */
+#define CFG_DISP_PRI_SCREEN_LAYER               0
+#define CFG_DISP_PRI_SCREEN_RGB_FORMAT          MLC_RGBFMT_A8R8G8B8
+#define CFG_DISP_PRI_SCREEN_PIXEL_BYTE	        4
+#define CFG_DISP_PRI_SCREEN_COLOR_KEY	        0x090909
+
+#define CFG_DISP_PRI_VIDEO_PRIORITY				2	// 0, 1, 2, 3
+#define CFG_DISP_PRI_BACK_GROUND_COLOR	     	0x0
+
+#define CFG_DISP_PRI_MLC_INTERLACE              CFALSE
+
+#define CFG_DISP_PRI_RESOL_WIDTH          		1024	// X Resolution
+#define CFG_DISP_PRI_RESOL_HEIGHT				 768	// Y Resolution
+
+#define CFG_DISP_PRI_HSYNC_SYNC_WIDTH           1
+#define CFG_DISP_PRI_HSYNC_BACK_PORCH           0
+#define CFG_DISP_PRI_HSYNC_FRONT_PORCH          160
+#define CFG_DISP_PRI_HSYNC_ACTIVE_HIGH          CFALSE
+#define CFG_DISP_PRI_VSYNC_SYNC_WIDTH           10
+#define CFG_DISP_PRI_VSYNC_BACK_PORCH           0
+#define CFG_DISP_PRI_VSYNC_FRONT_PORCH          27
+#define CFG_DISP_PRI_VSYNC_ACTIVE_HIGH 	        CFALSE
+
+#define CFG_DISP_PRI_CLKGEN0_SOURCE             DPC_VCLK_SRC_PLL0
+#define CFG_DISP_PRI_CLKGEN0_DIV                14
+#define CFG_DISP_PRI_CLKGEN0_DELAY              0
+#define CFG_DISP_PRI_CLKGEN0_INVERT				0
+#define CFG_DISP_PRI_CLKGEN1_SOURCE             DPC_VCLK_SRC_VCLK2
+#define CFG_DISP_PRI_CLKGEN1_DIV                1
+#define CFG_DISP_PRI_CLKGEN1_DELAY              0
+#define CFG_DISP_PRI_CLKGEN1_INVERT				0
+#define CFG_DISP_PRI_CLKSEL1_SELECT				0
+#define CFG_DISP_PRI_PADCLKSEL                  DPC_PADCLKSEL_VCLK	/* VCLK=CLKGEN1, VCLK12=CLKGEN0 */
+
+#define	CFG_DISP_PRI_PIXEL_CLOCK				800000000/CFG_DISP_PRI_CLKGEN0_DIV
+
+#define	CFG_DISP_PRI_OUT_SWAPRB 				CFALSE
+#define CFG_DISP_PRI_OUT_FORMAT                 DPC_FORMAT_RGB666
+#define CFG_DISP_PRI_OUT_YCORDER                DPC_YCORDER_CbYCrY
+#define CFG_DISP_PRI_OUT_INTERLACE              CFALSE
+#define CFG_DISP_PRI_OUT_INVERT_FIELD           CFALSE
+
+/* Secondary */
+#define CFG_DISP_SEC_SCREEN_LAYER               1
+#define CFG_DISP_SEC_SCREEN_RGB_FORMAT          MLC_RGBFMT_R5G6B5
+#define CFG_DISP_SEC_SCREEN_PIXEL_BYTE	        2
+#define CFG_DISP_SEC_SCREEN_COLOR_KEY	        0x090909
+
+#define CFG_DISP_SEC_VIDEO_PRIORITY				2	// 0, 1, 2, 3
+#define CFG_DISP_SEC_BACK_GROUND_COLOR	     	0x0
+
+#define CFG_DISP_SEC_MLC_INTERLACE              CFALSE
+#define	CFG_DISP_SEC_MLC_LOCKSIZE				8
+
+#define CFG_DISP_SEC_RESOL_WIDTH          		1280	// X Resolution
+#define CFG_DISP_SEC_RESOL_HEIGHT				 800	// Y Resolution
+
+#define CFG_DISP_SEC_HSYNC_SYNC_WIDTH           1
+#define CFG_DISP_SEC_HSYNC_BACK_PORCH           0
+#define CFG_DISP_SEC_HSYNC_FRONT_PORCH          160
+#define CFG_DISP_SEC_HSYNC_ACTIVE_HIGH          CFALSE
+#define CFG_DISP_SEC_VSYNC_SYNC_WIDTH           1
+#define CFG_DISP_SEC_VSYNC_BACK_PORCH           0
+#define CFG_DISP_SEC_VSYNC_FRONT_PORCH          23
+#define CFG_DISP_SEC_VSYNC_ACTIVE_HIGH 	        CFALSE
+
+#define CFG_DISP_SEC_CLKGEN0_SOURCE             DPC_VCLK_SRC_PLL1
+#define CFG_DISP_SEC_CLKGEN0_DIV                2
+#define CFG_DISP_SEC_CLKGEN0_DELAY              0
+#define CFG_DISP_SEC_CLKGEN0_INVERT				0
+#define CFG_DISP_SEC_CLKGEN1_SOURCE             DPC_VCLK_SRC_VCLK2
+#define CFG_DISP_SEC_CLKGEN1_DIV                1
+#define CFG_DISP_SEC_CLKGEN1_DELAY              0
+#define CFG_DISP_SEC_CLKGEN1_INVERT				0
+#define CFG_DISP_SEC_CLKSEL1_SELECT				0
+#define CFG_DISP_SEC_PADCLKSEL                  DPC_PADCLKSEL_VCLK	/* VCLK=CLKGEN1, VCLK12=CLKGEN0 */
+
+#define	CFG_DISP_SEC_PIXEL_CLOCK				70000000
+
+#define	CFG_DISP_SEC_OUT_SWAPRB 				CFALSE
+#define CFG_DISP_SEC_OUT_FORMAT                 DPC_FORMAT_RGB666
+#define CFG_DISP_SEC_OUT_YCORDER                DPC_YCORDER_CbYCrY
+#define CFG_DISP_SEC_OUT_INTERLACE              CFALSE
+#define CFG_DISP_SEC_OUT_INVERT_FIELD           CFALSE
+
+/*------------------------------------------------------------------------------
+ * 	PWM
+ */
+#define CFG_LCD_PRI_PWM_CH						1
+#define CFG_LCD_PRI_PWM_FREQ					20000
+#define CFG_LCD_PRI_PWM_DUTYCYCLE				100		/* (%) */
+
+/*------------------------------------------------------------------------------
+ * 	Audio I2S (0, 1, 2)
+ */
+#define	CFG_AUDIO_I2S0_MASTER_MODE				CTRUE	// CTRUE
+#define	CFG_AUDIO_I2S0_TRANS_MODE				0		// 0:I2S, 1:Left 2:Right justified */
+#define	CFG_AUDIO_I2S0_FRAME_BIT				48		// 32, 48
+#define	CFG_AUDIO_I2S0_SAMPLE_RATE				48000
+#define	CFG_AUDIO_I2S0_PRE_SUPPLY_MCLK			0
+
+#define	CFG_AUDIO_I2S1_MASTER_MODE				CTRUE	// CTRUE
+#define	CFG_AUDIO_I2S1_TRANS_MODE				0		// 0:I2S, 1:Left 2:Right justified */
+#define	CFG_AUDIO_I2S1_FRAME_BIT				48		// 32, 48
+#define	CFG_AUDIO_I2S1_SAMPLE_RATE				48000
+#define	CFG_AUDIO_I2S1_PRE_SUPPLY_MCLK			0
+
+#define	CFG_AUDIO_I2S2_MASTER_MODE				CTRUE	// CTRUE
+#define	CFG_AUDIO_I2S2_TRANS_MODE				0		// 0:I2S, 1:Left 2:Right justified */
+#define	CFG_AUDIO_I2S2_FRAME_BIT				48		// 32, 48
+#define	CFG_AUDIO_I2S2_SAMPLE_RATE				48000
+#define	CFG_AUDIO_I2S2_PRE_SUPPLY_MCLK			0
+
+/*------------------------------------------------------------------------------
+ * 	Audio SPDIF (TX/RX)
+ */
+#define	CFG_AUDIO_SPDIF_TX_HDMI_OUT					CTRUE
+#define	CFG_AUDIO_SPDIF_TX_SAMPLE_RATE				48000
+#define	CFG_AUDIO_SPDIF_RX_SAMPLE_RATE				48000
+
+/*------------------------------------------------------------------------------
+ * 	I2C
+ */
+#define CFG_I2C0_CLK							100000
+#define CFG_I2C1_CLK							100000
+#define CFG_I2C2_CLK							100000
+
+/*------------------------------------------------------------------------------
+ *  MPEGTSIF
+ */
+#define CFG_MPEGTS_MASTER_MODE					1 /* 0: slave, 1: master */
+#define CFG_MPEGTS_SLAVE_MODE					0 /* 0: slave, 1: master */
+#define CFG_MPEGTS_CLOCKPOL						1 /* 0: falling, 1: rising */
+#define CFG_MPEGTS_DATAPOL						1 /* 0: data is low, 1: data is high */
+#define CFG_MPEGTS_SYNCPOL						1 /* 0: falling, 1: rising */
+#define CFG_MPEGTS_ERRORPOL						1 /* 0: falling, 1: rising */
+#define CFG_MPEGTS_DATAWIDTH					0 /* 0: 8bit, 1: 1bit */
+#define CFG_MPEGTS_WORDCNT						47 /* 1 ~ 64 */
+
+/*------------------------------------------------------------------------------
+ * 	Keypad
+ */
+
+#define CFG_KEYPAD_KEY_BUTTON					{ PAD_GPIO_A + 17, PAD_GPIO_A + 16, PAD_GPIO_ALV + 0 }
+#define CFG_KEYPAD_KEY_CODE						{ KEY_VOLUMEDOWN, KEY_VOLUMEUP, KEY_POWER }
+#define CFG_KEYPAD_REPEAT						CFALSE /* 0: Repeat Off 1 : Repeat On */
+
+/*------------------------------------------------------------------------------
+ * 	SDHC
+ */
+#define	CFG_SDMMC0_DETECT_IO					(PAD_GPIO_B + 24)	/* external cd */
+
+/*------------------------------------------------------------------------------
+ * 	Nand (HWECC)
+ */
+#define CFG_NAND_ECC_BYTES 						1024
+#define CFG_NAND_ECC_BITS               		4			/* 4,8,16 */
+#define CFG_NAND_ECC_LIMIT             			(CFG_NAND_ECC_BITS)			/* ecc correction limit */
+
+/*------------------------------------------------------------------------------
+ * 	Suspend mode
+ */
+
+/* Wakeup Source : ALIVE [0~7] */
+#define CFG_PWR_WAKEUP_SRC_ALIVE0				CTRUE					/* KEY */
+#define CFG_PWR_WAKEUP_MOD_ALIVE0				PWR_DECT_FALLINGEDGE
+#define CFG_PWR_WAKEUP_SRC_ALIVE1				CFALSE
+#define CFG_PWR_WAKEUP_MOD_ALIVE1				PWR_DECT_FALLINGEDGE
+#define CFG_PWR_WAKEUP_SRC_ALIVE2				CFALSE
+#define CFG_PWR_WAKEUP_MOD_ALIVE2				PWR_DECT_FALLINGEDGE
+#define CFG_PWR_WAKEUP_SRC_ALIVE3				CFALSE
+#define CFG_PWR_WAKEUP_MOD_ALIVE3				PWR_DECT_FALLINGEDGE
+#define CFG_PWR_WAKEUP_SRC_ALIVE4				CFALSE
+#define CFG_PWR_WAKEUP_MOD_ALIVE4				PWR_DECT_FALLINGEDGE
+#define CFG_PWR_WAKEUP_SRC_ALIVE5				CFALSE
+#define CFG_PWR_WAKEUP_MOD_ALIVE5				PWR_DECT_FALLINGEDGE
+#define CFG_PWR_WAKEUP_SRC_ALIVE6				CFALSE
+#define CFG_PWR_WAKEUP_MOD_ALIVE6				PWR_DECT_FALLINGEDGE
+#define CFG_PWR_WAKEUP_SRC_ALIVE7				CFALSE
+#define CFG_PWR_WAKEUP_MOD_ALIVE7				PWR_DECT_FALLINGEDGE
+
+#endif /* __CFG_MAIN_H__ */

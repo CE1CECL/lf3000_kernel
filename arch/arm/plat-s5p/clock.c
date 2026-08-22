@@ -45,6 +45,11 @@ struct clk clk_xxti= {
 	.id		= -1,
 };
 
+struct clk clk_xxti= {
+	.name		= "xxti",
+	.id		= -1,
+};
+
 struct clk s5p_clk_27m = {
 	.name		= "clk_27m",
 	.id		= -1,

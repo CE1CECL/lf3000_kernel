@@ -1,0 +1,1 @@
+../../../arch/arm/mach-nxp4330/lfp100.c

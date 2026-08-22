@@ -198,6 +198,12 @@ config USB_EHCI_S5P
        help
 	 Enable support for the S5P SOC's on-chip EHCI controller.
 
+config USB_EHCI_NXP4330
+       boolean "NXP4330 EHCI support"
+       depends on USB_EHCI_HCD && ARCH_NXP4330
+       help
+	 Enable support for the NXP4330 SOC's on-chip EHCI controller.
+
 config USB_EHCI_MV
 	bool "EHCI support for Marvell on-chip controller"
 	depends on USB_EHCI_HCD && (ARCH_PXA || ARCH_MMP)
@@ -602,6 +608,30 @@ config USB_HWA_HCD
 
 	  To compile this driver a module, choose M here: the module
 	  will be called "hwa-hc".
+
+config USB_DWCOTG
+    tristate "Synopsis DWC host support"
+    depends on USB 
+    help
+      The Synopsis DWC controller is a dual-role
+      host/peripheral/OTG ("On The Go") USB controllers.
+
+      Enable this option to support this IP in host controller mode.
+      If unsure, say N.
+
+      To compile this driver as a module, choose M here: the 
+      modules built will be called dwc_otg and dwc_common_port.
+
+config USB_DWCOTG_FORCE_DEVICE
+    bool "Synopsis DWC force device mode"
+    depends on USB_DWCOTG
+    default n
+    help
+      The Synopsis DWC controller is a dual-role
+      host/peripheral/OTG ("On The Go") USB controllers.
+      
+      Enable this option to force a Synopsis DWC controller into device
+      mode. If unsure, say N.
 
 config USB_IMX21_HCD
        tristate "i.MX21 HCD support"

@@ -43,6 +43,5 @@ config WL12XX_SDIO
 	  Say N if unsure.
 
 config WL12XX_PLATFORM_DATA
-	bool
-	depends on WL12XX_SDIO != n || WL1251_SDIO != n
-	default y
+	bool "TI wl12xx platform data support"
+	default n

@@ -30,10 +30,13 @@
 #include <linux/seq_file.h>
 #include <linux/device.h>
 #include <linux/serial.h> /* for serial_state and serial_icounter_struct */
+#include <linux/amba/serial.h>
 #include <linux/serial_core.h>
 #include <linux/delay.h>
 #include <linux/mutex.h>
 
+
+#include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/uaccess.h>
 
@@ -50,6 +53,8 @@ static struct lock_class_key port_lock_key;
 
 #define HIGH_BITS_OFFSET	((sizeof(long)-sizeof(int))*8)
 
+//#define SERIAL_DEBUG 1
+
 #ifdef CONFIG_SERIAL_CORE_CONSOLE
 #define uart_console(port)	((port)->cons && (port)->cons->index == (port)->line)
 #else
@@ -62,6 +67,31 @@ static void uart_wait_until_sent(struct tty_struct *tty, int timeout);
 static void uart_change_pm(struct uart_state *state, int pm_state);
 
 static void uart_port_shutdown(struct tty_port *port);
+
+#ifdef SERIAL_DEBUG
+static void print_port_registers(struct uart_port *port)
+{
+	printk(KERN_INFO "\nUART PORT %d \n", port->line);
+	//printk(KERN_INFO "UART01x_DR = 0x%08x \n", readw(uap->port.membase + UART01x_DR));
+	//printk(KERN_INFO "UART01x_RSR = 0x%08x \n", readw(uap->port.membase + UART01x_RSR));
+	//printk(KERN_INFO "UART010_LCRM = 0x%08x \n", readw(uap->port.membase + UART010_LCRM));
+	//printk(KERN_INFO "UART010_LCRL = 0x%08x \n", readw(uap->port.membase + UART010_LCRL));
+	printk(KERN_INFO "UART01x_FR = 0x%08x \n", readw(port->membase + UART01x_FR));
+	//printk(KERN_INFO "UART010_IIR = 0x%08x \n", readw(uap->port.membase + UART010_IIR));
+	//printk(KERN_INFO "UART010_ICR = 0x%08x \n", readw(uap->port.membase + UART010_ICR));
+	//printk(KERN_INFO "UART01x_ILPR = 0x%08x \n", readw(uap->port.membase + UART01x_ILPR));
+	printk(KERN_INFO "UART011_IBRD = 0x%08x \n", readw(port->membase + UART011_IBRD));
+	printk(KERN_INFO "UART011_FBRD = 0x%08x \n", readw(port->membase + UART011_FBRD));
+	printk(KERN_INFO "UART011_LCRH = 0x%08x \n", readw(port->membase + UART011_LCRH));
+	printk(KERN_INFO "UART011_CR = 0x%08x \n", readw(port->membase + UART011_CR));
+	printk(KERN_INFO "UART011_IFLS = 0x%08x \n", readw(port->membase + UART011_IFLS));
+	//printk(KERN_INFO "UART011_IMSC = 0x%08x \n", readw(uap->port.membase + UART011_IMSC));
+	printk(KERN_INFO "UART011_RIS = 0x%08x \n", readw(port->membase + UART011_RIS));
+	//printk(KERN_INFO "UART011_MIS = 0x%08x \n", readw(uap->port.membase + UART011_MIS));
+	//printk(KERN_INFO "UART011_ICR = 0x%08x \n", readw(uap->port.membase + UART011_ICR));
+	//printk(KERN_INFO "UART011_DMACR = 0x%08x \n", readw(uap->port.membase + UART011_DMACR));
+}
+#endif
 
 /*
  * This routine is used by the interrupt handler to schedule processing in
@@ -83,6 +113,11 @@ static void uart_stop(struct tty_struct *tty)
 	struct uart_state *state = tty->driver_data;
 	struct uart_port *port = state->uart_port;
 	unsigned long flags;
+	
+#ifdef SERIAL_DEBUG	
+	if (port->line == 1)
+		printk(KERN_INFO "uart_stop %d\n", __LINE__);
+#endif
 
 	spin_lock_irqsave(&port->lock, flags);
 	port->ops->stop_tx(port);
@@ -107,6 +142,11 @@ static void uart_start(struct tty_struct *tty)
 	struct uart_state *state = tty->driver_data;
 	struct uart_port *port = state->uart_port;
 	unsigned long flags;
+
+#ifdef SERIAL_DEBUG	
+	if (port->line == 1)
+		printk(KERN_INFO "uart_start %d\n", __LINE__);
+#endif
 
 	spin_lock_irqsave(&port->lock, flags);
 	__uart_start(tty);
@@ -160,7 +200,7 @@ static int uart_port_startup(struct tty_struct *tty, struct uart_state *state,
 	}
 
 	retval = uport->ops->startup(uport);
-	if (retval == 0) {
+	if (retval == 0) {		
 		if (uart_console(uport) && uport->cons->cflag) {
 			tty->termios->c_cflag = uport->cons->cflag;
 			uport->cons->cflag = 0;
@@ -178,6 +218,10 @@ static int uart_port_startup(struct tty_struct *tty, struct uart_state *state,
 			if (tty->termios->c_cflag & CBAUD)
 				uart_set_mctrl(uport, TIOCM_RTS | TIOCM_DTR);
 		}
+//#ifdef SERIAL_DEBUG		
+		//printk(KERN_INFO "uart_port_startup %d\n", __LINE__);
+		//print_port_registers(uport);
+//#endif
 
 		if (port->flags & ASYNC_CTS_FLOW) {
 			spin_lock_irq(&uport->lock);
@@ -186,6 +230,9 @@ static int uart_port_startup(struct tty_struct *tty, struct uart_state *state,
 			spin_unlock_irq(&uport->lock);
 		}
 	}
+#ifdef SERIAL_DEBUG		
+		printk(KERN_INFO "uart_port_startup %d\n", __LINE__);
+#endif
 
 	/*
 	 * This is to allow setserial on this port. People may want to set
@@ -219,6 +266,11 @@ static int uart_startup(struct tty_struct *tty, struct uart_state *state,
 		clear_bit(TTY_IO_ERROR, &tty->flags);
 	} else if (retval > 0)
 		retval = 0;
+		
+#ifdef SERIAL_DEBUG			
+		printk(KERN_INFO "uart_startup %d\n", __LINE__);
+		print_port_registers(state->uart_port);
+#endif
 
 	return retval;
 }
@@ -350,17 +402,20 @@ uart_get_baud_rate(struct uart_port *port, struct ktermios *termios,
 		altbaud = 230400;
 	else if (flags == UPF_SPD_WARP)
 		altbaud = 460800;
+		
+#ifdef SERIAL_DEBUG	
+	printk(KERN_INFO "uart_get_baud_rate %d %u %u\n", __LINE__, altbaud, max);
+#endif
 
 	for (try = 0; try < 2; try++) {
 		baud = tty_termios_baud_rate(termios);
-
 		/*
 		 * The spd_hi, spd_vhi, spd_shi, spd_warp kludge...
 		 * Die! Die! Die!
 		 */
 		if (baud == 38400)
 			baud = altbaud;
-
+			
 		/*
 		 * Special case: B0 rate.
 		 */
@@ -379,6 +434,7 @@ uart_get_baud_rate(struct uart_port *port, struct ktermios *termios,
 		termios->c_cflag &= ~CBAUD;
 		if (old) {
 			baud = tty_termios_baud_rate(old);
+
 			if (!hung_up)
 				tty_termios_encode_baud_rate(termios,
 								baud, baud);
@@ -503,6 +559,7 @@ static int uart_write(struct tty_struct *tty,
 	struct circ_buf *circ;
 	unsigned long flags;
 	int c, ret = 0;
+	
 
 	/*
 	 * This means you called this function _after_ the port was
@@ -532,8 +589,8 @@ static int uart_write(struct tty_struct *tty,
 		count -= c;
 		ret += c;
 	}
+	
 	spin_unlock_irqrestore(&port->lock, flags);
-
 	uart_start(tty);
 	return ret;
 }
@@ -1506,7 +1563,7 @@ static int uart_open(struct tty_struct *tty, struct file *filp)
 	state->uart_port->state = state;
 	tty->low_latency = (state->uart_port->flags & UPF_LOW_LATENCY) ? 1 : 0;
 	tty_port_tty_set(port, tty);
-
+	
 	/*
 	 * If the port is in the middle of closing, bail out now.
 	 */
@@ -1514,13 +1571,13 @@ static int uart_open(struct tty_struct *tty, struct file *filp)
 		retval = -EAGAIN;
 		goto err_dec_count;
 	}
-
+	
 	/*
 	 * Make sure the device is in D0 state.
 	 */
 	if (port->count == 1)
 		uart_change_pm(state, 0);
-
+		
 	/*
 	 * Start up the serial port.
 	 */
@@ -2073,6 +2130,7 @@ uart_configure_port(struct uart_driver *drv, struct uart_state *state,
 
 	if (port->type != PORT_UNKNOWN) {
 		unsigned long flags;
+		
 
 		uart_report_port(drv, port);
 
@@ -2086,8 +2144,9 @@ uart_configure_port(struct uart_driver *drv, struct uart_state *state,
 		 */
 		spin_lock_irqsave(&port->lock, flags);
 		port->ops->set_mctrl(port, port->mctrl & TIOCM_DTR);
-		spin_unlock_irqrestore(&port->lock, flags);
 
+		spin_unlock_irqrestore(&port->lock, flags);
+	
 		/*
 		 * If this driver supports console, and it hasn't been
 		 * successfully registered yet, try to re-register it.
@@ -2095,6 +2154,20 @@ uart_configure_port(struct uart_driver *drv, struct uart_state *state,
 		 */
 		if (port->cons && !(port->cons->flags & CON_ENABLED))
 			register_console(port->cons);
+			
+							
+		if (port->line == 1)
+		{
+			writew(0x00000005, port->membase + UART011_FBRD);
+		}
+
+//#ifdef SERIAL_DEBUG
+	//if (port->line == 1)
+	//{
+		//printk(KERN_INFO "UART%d uart_configure_port %d\n", port->line, __LINE__);
+		//print_port_registers(port);
+	//}
+//#endif
 
 		/*
 		 * Power down all ports by default, except the
@@ -2344,7 +2417,7 @@ int uart_add_one_port(struct uart_driver *drv, struct uart_port *uport)
 	}
 
 	uart_configure_port(drv, state, uport);
-
+	
 	/*
 	 * Register the port whether it's detected or not.  This allows
 	 * setserial to be used to alter this ports parameters.
@@ -2356,6 +2429,14 @@ int uart_add_one_port(struct uart_driver *drv, struct uart_port *uport)
 		printk(KERN_ERR "Cannot register tty device on line %d\n",
 		       uport->line);
 	}
+	
+//#ifdef SERIAL_DEBUG
+	//if ((uport->line == 0) | (uport->line == 1))
+	//{
+		//printk(KERN_INFO "UART%d uart_add_one_port %d\n", uport->line, __LINE__);
+		//print_port_registers(uport);
+	//}
+//#endif
 
 	/*
 	 * Ensure UPF_DEAD is not set.

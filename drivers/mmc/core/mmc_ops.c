@@ -409,6 +409,8 @@ int mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
 			break;
 		if (mmc_host_is_spi(card->host))
 			break;
+		//printk(KERN_INFO "%s: %s %d \n", mmc_hostname(card->host),__func__, __LINE__);
+		//printk(KERN_INFO "opcode = %u\t index = %u\t value=%u\t cmd_timeout_ms = %u\n", cmd.opcode, index, value, cmd.cmd_timeout_ms);
 	} while (R1_CURRENT_STATE(status) == R1_STATE_PRG);
 
 	if (mmc_host_is_spi(card->host)) {

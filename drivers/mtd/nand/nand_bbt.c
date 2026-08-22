@@ -108,9 +108,10 @@ static int check_pattern(uint8_t *buf, int len, int paglen, struct nand_bbt_desc
 	p += end;
 
 	/* Compare the pattern */
-	if (memcmp(p, td->pattern, td->len))
+	for (i = 0; i < td->len; i++) {
+		if (p[i] != td->pattern[i])
 		return -1;
-
+	}
 	if (td->options & NAND_BBT_SCANEMPTY) {
 		p += td->len;
 		end += td->len;
@@ -468,6 +469,12 @@ static int create_bbt(struct mtd_info *mtd, uint8_t *buf,
 	loff_t from;
 	size_t readlen;
 
+	/* LF: Added in an attempt to avoid tons of bad block msg for OTP*/
+        if (this->ecc.mode == NAND_ECC_NONE)
+        {
+                printk(KERN_INFO "SKIPPING: Scanning device for bad blocks\n");
+                return 0;
+        }
 	pr_info("Scanning device for bad blocks\n");
 
 	if (bd->options & NAND_BBT_SCANALLPAGES)
@@ -1304,7 +1311,10 @@ static struct nand_bbt_descr bbt_mirror_no_bbt_descr = {
  * this->badblock_pattern. Thus, this->badblock_pattern should be NULL when
  * passed to this function.
  */
-static int nand_create_badblock_pattern(struct nand_chip *this)
+#if 0	// 15jul11
+static 
+#endif
+int nand_create_badblock_pattern(struct nand_chip *this)
 {
 	struct nand_bbt_descr *bd;
 	if (this->badblock_pattern) {
@@ -1312,8 +1322,10 @@ static int nand_create_badblock_pattern(struct nand_chip *this)
 		return -EINVAL;
 	}
 	bd = kzalloc(sizeof(*bd), GFP_KERNEL);
-	if (!bd)
+	if (!bd) {
+		pr_err("nand_create_badblock_pattern: Out of memory\n");
 		return -ENOMEM;
+	}
 	bd->options = this->bbt_options & BADBLOCK_SCAN_MASK;
 	bd->offs = this->badblockpos;
 	bd->len = (this->options & NAND_BUSWIDTH_16) ? 2 : 1;
@@ -1322,6 +1334,9 @@ static int nand_create_badblock_pattern(struct nand_chip *this)
 	this->badblock_pattern = bd;
 	return 0;
 }
+#if 1	// 15jul11
+EXPORT_SYMBOL(nand_create_badblock_pattern);
+#endif
 
 /**
  * nand_default_bbt - [NAND Interface] Select a default bad block table for the device

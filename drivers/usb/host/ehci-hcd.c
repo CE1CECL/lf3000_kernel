@@ -1355,9 +1355,9 @@ MODULE_LICENSE ("GPL");
 #define PLATFORM_DRIVER		tegra_ehci_driver
 #endif
 
-#ifdef CONFIG_USB_EHCI_S5P
-#include "ehci-s5p.c"
-#define PLATFORM_DRIVER		s5p_ehci_driver
+#ifdef CONFIG_USB_EHCI_NXP4330
+#include "ehci-nxp4330.c"
+#define PLATFORM_DRIVER		nxp_ehci_driver
 #endif
 
 #ifdef CONFIG_SPARC_LEON
@@ -1388,7 +1388,7 @@ MODULE_LICENSE ("GPL");
 #if !defined(PCI_DRIVER) && !defined(PLATFORM_DRIVER) && \
     !defined(PS3_SYSTEM_BUS_DRIVER) && !defined(OF_PLATFORM_DRIVER) && \
     !defined(XILINX_OF_PLATFORM_DRIVER)
-#error "missing bus glue for ehci-hcd"
+//#error "missing bus glue for ehci-hcd"
 #endif
 
 static int __init ehci_hcd_init(void)

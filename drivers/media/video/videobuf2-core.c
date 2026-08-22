@@ -24,11 +24,16 @@
 static int debug;
 module_param(debug, int, 0644);
 
+// psw0523 debugging
+#if 1
 #define dprintk(level, fmt, arg...)					\
 	do {								\
 		if (debug >= level)					\
 			printk(KERN_DEBUG "vb2: " fmt, ## arg);		\
 	} while (0)
+#else
+#define dprintk(level, fmt, arg...) printk("vb2: " fmt, ## arg)
+#endif
 
 #define call_memop(q, op, args...)					\
 	(((q)->mem_ops->op) ?						\
@@ -1079,14 +1084,18 @@ static int __qbuf_dmabuf(struct vb2_buffer *vb, const struct v4l2_buffer *b)
 
 	/* Verify and copy relevant information provided by the userspace */
 	ret = __fill_vb2_buffer(vb, b, planes);
-	if (ret)
+	if (ret) {
+        printk("%s: failed to __fill_vb2_buffer()\n", __func__);
 		return ret;
+    }
 
 	for (plane = 0; plane < vb->num_planes; ++plane) {
 		struct dma_buf *dbuf = dma_buf_get(planes[plane].m.fd);
 
 		if (IS_ERR_OR_NULL(dbuf)) {
-			dprintk(1, "qbuf: invalid dmabuf fd for "
+			/* dprintk(1, "qbuf: invalid dmabuf fd for " */
+			/* 	"plane %d\n", plane); */
+			printk("qbuf: invalid dmabuf fd for "
 				"plane %d\n", plane);
 			ret = -EINVAL;
 			goto err;
@@ -1109,7 +1118,9 @@ static int __qbuf_dmabuf(struct vb2_buffer *vb, const struct v4l2_buffer *b)
 		mem_priv = call_memop(q, attach_dmabuf, q->alloc_ctx[plane],
 			dbuf, q->plane_sizes[plane], write);
 		if (IS_ERR(mem_priv)) {
-			dprintk(1, "qbuf: failed acquiring dmabuf "
+			/* dprintk(1, "qbuf: failed acquiring dmabuf " */
+			/* 	"memory for plane %d\n", plane); */
+			printk("qbuf: failed acquiring dmabuf "
 				"memory for plane %d\n", plane);
 			ret = PTR_ERR(mem_priv);
 			goto err;
@@ -1127,7 +1138,9 @@ static int __qbuf_dmabuf(struct vb2_buffer *vb, const struct v4l2_buffer *b)
 	for (plane = 0; plane < vb->num_planes; ++plane) {
 		ret = call_memop(q, map_dmabuf, vb->planes[plane].mem_priv);
 		if (ret) {
-			dprintk(1, "qbuf: failed mapping dmabuf "
+			/* dprintk(1, "qbuf: failed mapping dmabuf " */
+			/* 	"memory for plane %d\n", plane); */
+			printk("qbuf: failed mapping dmabuf "
 				"memory for plane %d\n", plane);
 			goto err;
 		}
@@ -1140,7 +1153,8 @@ static int __qbuf_dmabuf(struct vb2_buffer *vb, const struct v4l2_buffer *b)
 	 */
 	ret = call_qop(q, buf_init, vb);
 	if (ret) {
-		dprintk(1, "qbuf: buffer initialization failed\n");
+		/* dprintk(1, "qbuf: buffer initialization failed\n"); */
+		printk("qbuf: buffer initialization failed\n");
 		goto err;
 	}
 
@@ -1200,7 +1214,8 @@ static int __buf_prepare(struct vb2_buffer *vb, const struct v4l2_buffer *b)
 	if (!ret)
 		ret = call_qop(q, buf_prepare, vb);
 	if (ret)
-		dprintk(1, "qbuf: buffer preparation failed: %d\n", ret);
+		/* dprintk(1, "qbuf: buffer preparation failed: %d\n", ret); */
+		printk("qbuf: buffer preparation failed: %d\n", ret);
 	else
 		vb->state = VB2_BUF_STATE_PREPARED;
 
@@ -1316,19 +1331,22 @@ int vb2_qbuf(struct vb2_queue *q, struct v4l2_buffer *b)
 	}
 
 	if (q->fileio) {
-		dprintk(1, "qbuf: file io in progress\n");
+		/* dprintk(1, "qbuf: file io in progress\n"); */
+		printk("qbuf: file io in progress\n");
 		ret = -EBUSY;
 		goto unlock;
 	}
 
 	if (b->type != q->type) {
-		dprintk(1, "qbuf: invalid buffer type\n");
+		/* dprintk(1, "qbuf: invalid buffer type\n"); */
+		printk("qbuf: invalid buffer type\n");
 		ret = -EINVAL;
 		goto unlock;
 	}
 
 	if (b->index >= q->num_buffers) {
-		dprintk(1, "qbuf: buffer index out of range\n");
+		/* dprintk(1, "qbuf: buffer index out of range\n"); */
+		printk("qbuf: buffer index out of range(%d/%d)\n", b->index, q->num_buffers);
 		ret = -EINVAL;
 		goto unlock;
 	}
@@ -1336,13 +1354,15 @@ int vb2_qbuf(struct vb2_queue *q, struct v4l2_buffer *b)
 	vb = q->bufs[b->index];
 	if (NULL == vb) {
 		/* Should never happen */
-		dprintk(1, "qbuf: buffer is NULL\n");
+		/* dprintk(1, "qbuf: buffer is NULL\n"); */
+		printk("qbuf: buffer is NULL\n");
 		ret = -EINVAL;
 		goto unlock;
 	}
 
 	if (b->memory != q->memory) {
-		dprintk(1, "qbuf: invalid memory type\n");
+		/* dprintk(1, "qbuf: invalid memory type\n"); */
+		printk("qbuf: invalid memory type\n");
 		ret = -EINVAL;
 		goto unlock;
 	}
@@ -1350,12 +1370,15 @@ int vb2_qbuf(struct vb2_queue *q, struct v4l2_buffer *b)
 	switch (vb->state) {
 	case VB2_BUF_STATE_DEQUEUED:
 		ret = __buf_prepare(vb, b);
-		if (ret)
+		if (ret) {
+            printk("%s: failed t- __buf_prepare\n", __func__);
 			goto unlock;
+        }
 	case VB2_BUF_STATE_PREPARED:
 		break;
 	default:
-		dprintk(1, "qbuf: buffer already in use\n");
+		/* dprintk(1, "qbuf: buffer already in use\n"); */
+		printk("qbuf: buffer already in use\n");
 		ret = -EINVAL;
 		goto unlock;
 	}

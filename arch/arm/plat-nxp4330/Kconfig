@@ -1,0 +1,98 @@
+#
+# Copyright 2009 Nexell.
+#
+# Configuration options for the NXP4330
+
+config PLAT_NXP4330
+	bool
+	default y
+
+#===============================================================================
+# Select Board
+#===============================================================================
+	comment "Board features"
+
+choice
+    prompt "Platform board"
+    default PLAT_NXP4330_LYNX
+
+	config PLAT_NXP4330_LYNX
+		bool "LYNX: Android MID board"
+		help
+   	 		Support for the android MID (Lynx) board.
+
+	config PLAT_NXP4330_VTK
+		bool "VTK: Validation Kit board"
+		help
+   	 		Support for the validation kit board.
+
+	config PLAT_NXP4330_SMARTBOX
+		bool "SMARTBOX: Android Smart Box"
+		help
+   	 		Support for the android smart box board.
+   	 		
+   	config PLAT_NXP4330_R3K
+		bool "LeapFrog R3K board"
+		help
+   	 		Placeholder for all LeapFrog boards.
+
+	config PLAT_NXP4330_CABO
+                bool "LeapFrog CABO board"
+                help
+                        Placeholder for all LeapFrog CABO boards.
+
+   	config PLAT_NXP4330_GLASGOW_ALPHA
+		bool "LeapFrog Glasgow board (ALPHA)"
+		help
+   	 		Platform Support for LeapFrog Glasgow board (ALPHA).
+
+	config PLAT_NXP4330_XANADU
+		bool "LeapFrog XANADU board"
+		help
+			Platform Support for LeapFrog Xanadu Boards.
+					
+endchoice
+
+config NXP4330_LEAPFROG
+	bool "Any LeapFrog board with LF3000"
+	depends on PLAT_NXP4330_CABO || PLAT_NXP4330_GLASGOW_ALPHA || PLAT_NXP4330_R3K || PLAT_NXP4330_XANADU
+	default y
+	---help---
+	This option ought to be selected for all LeapFrog boards (and
+	only LeapFrog boards).  Selecting it disables Nexell code that 
+	zeroes the ALIVE scratch register. 
+
+
+choice
+    prompt "Platform board LCD size"
+    default NEXELL_SOC_DISP_LCD_1024x600
+
+config NEXELL_SOC_DISP_LCD_480x272
+	bool "480x272 LCD"
+	depends on NEXELL_SOC_DISP_LCDIF
+
+config NEXELL_SOC_DISP_LCD_1024x600
+	bool "1024x600 LCD"
+	depends on NEXELL_SOC_DISP_LCDIF
+
+config NEXELL_SOC_DISP_LCD_1280x800
+	bool "1280x800 LCD"
+	depends on NEXELL_SOC_DISP_LCDIF
+
+endchoice
+
+#===============================================================================
+# Board dependent configure
+#===============================================================================
+if PLAT_NX4330_LYNX
+source "arch/arm/plat-nxp4330/lynx/Kconfig"
+endif
+
+if PLAT_NXP4330_VTK
+source "arch/arm/plat-nxp4330/vtk/Kconfig"
+endif
+
+if PLAT_NXP4330_R3K
+source "arch/arm/plat-nxp4330/r3k/Kconfig"
+endif
+

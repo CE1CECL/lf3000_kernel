@@ -65,6 +65,11 @@ static inline bool samsung_dma_has_infiniteloop(void)
 	return false;
 }
 
+static inline bool samsung_dma_has_infiniteloop(void)
+{
+	return false;
+}
+
 #include <plat/dma.h>
 
 #define DMACH_LOW_LEVEL	(1<<28)	/* use this to specifiy hardware ch no */

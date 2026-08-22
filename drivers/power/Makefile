@@ -14,6 +14,9 @@ obj-$(CONFIG_WM831X_POWER)	+= wm831x_power.o
 obj-$(CONFIG_WM8350_POWER)	+= wm8350_power.o
 obj-$(CONFIG_TEST_POWER)	+= test_power.o
 
+obj-$(CONFIG_CHARGER_NXE2000)	+= nxe2000-charger.o
+obj-$(CONFIG_CHARGER_NXE1100)	+= nxe1100-charger.o
+
 obj-$(CONFIG_BATTERY_DS2760)	+= ds2760_battery.o
 obj-$(CONFIG_BATTERY_DS2780)	+= ds2780_battery.o
 obj-$(CONFIG_BATTERY_DS2781)	+= ds2781_battery.o
@@ -44,4 +47,7 @@ obj-$(CONFIG_CHARGER_MANAGER)	+= charger-manager.o
 obj-$(CONFIG_CHARGER_MAX8997)	+= max8997_charger.o
 obj-$(CONFIG_CHARGER_MAX8998)	+= max8998_charger.o
 obj-$(CONFIG_CHARGER_SMB347)	+= smb347-charger.o
+obj-$(CONFIG_FUELGAUGE_MAX17047)	+= max17047_fuelgauge.o
+obj-$(CONFIG_CHARGER_BQ24191)	+= bq24191_charger.o
 obj-$(CONFIG_BATTERY_ANDROID)	+= android_battery.o
+obj-$(CONFIG_FUELGAUGE_DS2784)  += ds2784_fuelgauge.o

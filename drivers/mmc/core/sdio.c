@@ -467,6 +467,10 @@ static void sdio_select_driver_type(struct mmc_card *card)
 }
 
 
+/* Enable the following #define to generate lots of debug output */
+/*
+#define PM_DEBUG 1
+*/
 static int sdio_set_bus_speed_mode(struct mmc_card *card)
 {
 	unsigned int bus_speed, timing;
@@ -532,6 +536,9 @@ static int sdio_set_bus_speed_mode(struct mmc_card *card)
 	if (bus_speed) {
 		mmc_set_timing(card->host, timing);
 		mmc_set_clock(card->host, card->sw_caps.uhs_max_dtr);
+#ifdef PM_DEBUG
+printk(KERN_INFO "......from sdio_set_bus_speed_mode()\n");
+#endif
 	}
 
 	return 0;
@@ -723,6 +730,9 @@ static int mmc_sdio_init_card(struct mmc_host *host, u32 ocr,
 		 * structures in init_card().
 		 */
 		mmc_set_clock(host, card->cis.max_dtr);
+#ifdef PM_DEBUG
+printk(KERN_INFO "......from mmc_sdio_init_card(0x%x)\n", ocr);
+#endif
 
 		if (card->cccr.high_speed) {
 			mmc_card_set_highspeed(card);
@@ -816,6 +826,9 @@ static int mmc_sdio_init_card(struct mmc_host *host, u32 ocr,
 		 * Change to the card's maximum speed.
 		 */
 		mmc_set_clock(host, mmc_sdio_get_max_clock(card));
+#ifdef PM_DEBUG
+printk(KERN_INFO "......from mmc_sdio_init_card(0x%x)#2\n", ocr);
+#endif
 
 		/*
 		 * Switch to wider bus (if supported).
@@ -1051,6 +1064,9 @@ static int mmc_sdio_power_restore(struct mmc_host *host)
 		host->ocr_avail = host->ocr_avail_sdio;
 
 	host->ocr = mmc_select_voltage(host, ocr & ~0x7F);
+#ifdef PM_DEBUG
+printk(KERN_INFO "......from mmc_sdio_power_restore()\n");
+#endif
 	if (!host->ocr) {
 		ret = -EINVAL;
 		goto out;
@@ -1109,6 +1125,9 @@ int mmc_attach_sdio(struct mmc_host *host)
 	}
 
 	host->ocr = mmc_select_voltage(host, ocr);
+#ifdef PM_DEBUG
+printk(KERN_INFO "......from mmc_attach_sdio()\n");
+#endif
 
 	/*
 	 * Can we support the voltage(s) of the card(s)?
@@ -1248,12 +1267,18 @@ int sdio_reset_comm(struct mmc_card *card)
 	mmc_go_idle(host);
 
 	mmc_set_clock(host, host->f_min);
+#ifdef PM_DEBUG
+printk(KERN_INFO "......from sdio_reset_comm()\n");
+#endif
 
 	err = mmc_send_io_op_cond(host, 0, &ocr);
 	if (err)
 		goto err;
 
 	host->ocr = mmc_select_voltage(host, ocr);
+#ifdef PM_DEBUG
+printk(KERN_INFO "......from sdio_reset_comm()\n");
+#endif
 	if (!host->ocr) {
 		err = -EINVAL;
 		goto err;

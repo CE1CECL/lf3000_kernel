@@ -811,6 +811,17 @@ static int mmc_test_nonblock_transfer(struct mmc_test_card *test,
 	for (i = 0; i < count; i++) {
 		mmc_test_prepare_mrq(test, cur_areq->mrq, sg, sg_len, dev_addr,
 				     blocks, blksz, write);
+		/* Added next two statements after finding that tests
+		 * 38, 40, 42, and 44 crash without them.
+		 * Apparently we're using mmc driver code and data structs
+		 * that differ a little from the standard Linux distribution
+		 * code.  Our definition of struct mmc_async_req contains
+		 * two members that are not in the standard distribution.
+		 * Apparently mmc_test.c is from the standard distribution.
+		 */
+		cur_areq->__cond = false;
+		cur_areq->__mrq  = NULL;
+
 		done_areq = mmc_start_req(test->card->host, cur_areq, &ret);
 
 		if (ret || (!done_areq && i > 0))

@@ -31,13 +31,20 @@
 #include <linux/usb/ch9.h>
 #include <linux/usb/gadget.h>
 
-#include <mach/map.h>
+//#include <mach/map.h>
 
-#include <plat/regs-usb-hsotg-phy.h>
-#include <plat/regs-usb-hsotg.h>
-#include <mach/regs-sys.h>
-#include <plat/udc-hs.h>
-#include <plat/cpu.h>
+//#include <plat/regs-usb-hsotg-phy.h>
+//#include <plat/regs-usb-hsotg.h>
+//#include <mach/regs-sys.h>
+//#include <plat/udc-hs.h>
+//#include <plat/cpu.h>
+
+//#include <regs-usb-hsotg-phy.h>
+#include <regs-usb-hsotg.h>
+//#include <mach/regs-sys.h>
+#include <udc-hs.h>
+#include <usb-phy.h>
+//#include <plat/cpu.h>
 
 #define DMA_ADDR_INVALID (~((dma_addr_t)0))
 
@@ -300,6 +307,8 @@ static void s3c_hsotg_ctrl_epint(struct s3c_hsotg *hsotg,
 		daint &= ~bit;
 	writel(daint, hsotg->regs + S3C_DAINTMSK);
 	local_irq_restore(flags);
+#else
+#endif
 }
 
 /**
@@ -2854,6 +2863,7 @@ static void __devinit s3c_hsotg_initep(struct s3c_hsotg *hsotg,
  */
 static void s3c_hsotg_otgreset(struct s3c_hsotg *hsotg)
 {
+#if 0
 	struct clk *xusbxti;
 	u32 pwr, osc;
 
@@ -2888,8 +2898,9 @@ static void s3c_hsotg_otgreset(struct s3c_hsotg *hsotg)
 	writel(S3C_RSTCON_PHY, S3C_RSTCON);
 	udelay(20);	/* at-least 10uS */
 	writel(0, S3C_RSTCON);
+#else
+#endif
 }
-
 
 static void s3c_hsotg_init(struct s3c_hsotg *hsotg)
 {
@@ -3276,7 +3287,7 @@ static void s3c_hsotg_gate(struct platform_device *pdev, bool on)
 {
 	unsigned long flags;
 	u32 others;
-
+#if 0
 	local_irq_save(flags);
 
 	others = __raw_readl(S3C64XX_OTHERS);
@@ -3287,6 +3298,8 @@ static void s3c_hsotg_gate(struct platform_device *pdev, bool on)
 	__raw_writel(others, S3C64XX_OTHERS);
 
 	local_irq_restore(flags);
+#else
+#endif
 }
 
 static struct s3c_hsotg_plat s3c_hsotg_default_pdata;
@@ -3345,6 +3358,7 @@ static int __devinit s3c_hsotg_probe(struct platform_device *pdev)
 		goto err_regs_res;
 	}
 
+	// 인터럽트 설정
 	ret = platform_get_irq(pdev, 0);
 	if (ret < 0) {
 		dev_err(dev, "cannot find IRQ\n");
@@ -3395,6 +3409,14 @@ static int __devinit s3c_hsotg_probe(struct platform_device *pdev)
 	s3c_hsotg_otgreset(hsotg);
 	s3c_hsotg_corereset(hsotg);
 	s3c_hsotg_init(hsotg);
+
+	// juno
+	if (plat->phy_init)
+		plat->phy_init(pdev, S5P_USB_PHY_DEVICE);
+
+	// juno
+	if (plat->phy_init)
+		plat->phy_init(pdev, S5P_USB_PHY_DEVICE);
 
 	/* initialise the endpoints now the core has been initialised */
 	for (epnum = 0; epnum < S3C_HSOTG_EPS; epnum++)

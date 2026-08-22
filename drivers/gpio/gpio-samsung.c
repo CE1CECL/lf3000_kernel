@@ -1040,6 +1040,24 @@ static void __init samsung_gpiolib_add_4bit_chips_no_pm(struct samsung_gpio_chip
 	}
 }
 
+static void __init samsung_gpiolib_add_4bit_chips_no_pm(struct samsung_gpio_chip *chip,
+						  int nr_chips, void __iomem *base)
+{
+	int i;
+
+	for (i = 0 ; i < nr_chips; i++, chip++) {
+		chip->chip.direction_input = samsung_gpiolib_4bit_input;
+		chip->chip.direction_output = samsung_gpiolib_4bit_output;
+
+		if (!chip->config)
+			chip->config = &samsung_gpio_cfgs[2];
+		if ((base != NULL) && (chip->base == NULL))
+			chip->base = base + ((i) * 0x20);
+
+		samsung_gpiolib_add(chip);
+	}
+}
+
 static void __init samsung_gpiolib_add_4bit2_chips(struct samsung_gpio_chip *chip,
 						   int nr_chips)
 {
@@ -3230,6 +3248,102 @@ int s5p_gpio_set_drvstr(unsigned int pin, s5p_gpio_drvstr_t drvstr)
 }
 EXPORT_SYMBOL(s5p_gpio_set_drvstr);
 #endif	/* CONFIG_S5P_GPIO_DRVSTR */
+
+s5p_gpio_pd_cfg_t s5p_gpio_get_pd_cfg(unsigned int pin)
+{
+	struct samsung_gpio_chip *chip = samsung_gpiolib_getchip(pin);
+	unsigned int off;
+	void __iomem *reg;
+	int shift;
+	u32 pd_cfg;
+
+	if (!chip)
+		return -EINVAL;
+
+	off = pin - chip->chip.base;
+	shift = off * 2;
+	reg = chip->base + 0x10;
+
+	pd_cfg = __raw_readl(reg);
+	pd_cfg = pd_cfg >> shift;
+	pd_cfg &= 0x3;
+
+	return (__force s5p_gpio_pd_cfg_t)pd_cfg;
+}
+EXPORT_SYMBOL(s5p_gpio_get_pd_cfg);
+
+int s5p_gpio_set_pd_cfg(unsigned int pin, s5p_gpio_pd_cfg_t pd_cfg)
+{
+	struct samsung_gpio_chip *chip = samsung_gpiolib_getchip(pin);
+	unsigned int off;
+	void __iomem *reg;
+	int shift;
+	u32 tmp;
+
+	if (!chip)
+		return -EINVAL;
+
+	off = pin - chip->chip.base;
+	shift = off * 2;
+	reg = chip->base + 0x10;
+
+	tmp = __raw_readl(reg);
+	tmp &= ~(0x3 << shift);
+	tmp |= pd_cfg << shift;
+
+	__raw_writel(tmp, reg);
+
+	return 0;
+}
+EXPORT_SYMBOL(s5p_gpio_set_pd_cfg);
+
+s5p_gpio_pd_pull_t s5p_gpio_get_pd_pull(unsigned int pin)
+{
+	struct samsung_gpio_chip *chip = samsung_gpiolib_getchip(pin);
+	unsigned int off;
+	void __iomem *reg;
+	int shift;
+	u32 pd_pull;
+
+	if (!chip)
+		return -EINVAL;
+
+	off = pin - chip->chip.base;
+	shift = off * 2;
+	reg = chip->base + 0x14;
+
+	pd_pull = __raw_readl(reg);
+	pd_pull = pd_pull >> shift;
+	pd_pull &= 0x3;
+
+	return (__force s5p_gpio_pd_pull_t)pd_pull;
+}
+EXPORT_SYMBOL(s5p_gpio_get_pd_pull);
+
+int s5p_gpio_set_pd_pull(unsigned int pin, s5p_gpio_pd_pull_t pd_pull)
+{
+	struct samsung_gpio_chip *chip = samsung_gpiolib_getchip(pin);
+	unsigned int off;
+	void __iomem *reg;
+	int shift;
+	u32 tmp;
+
+	if (!chip)
+		return -EINVAL;
+
+	off = pin - chip->chip.base;
+	shift = off * 2;
+	reg = chip->base + 0x14;
+
+	tmp = __raw_readl(reg);
+	tmp &= ~(0x3 << shift);
+	tmp |= pd_pull << shift;
+
+	__raw_writel(tmp, reg);
+
+	return 0;
+}
+EXPORT_SYMBOL(s5p_gpio_set_pd_pull);
 
 s5p_gpio_pd_cfg_t s5p_gpio_get_pd_cfg(unsigned int pin)
 {

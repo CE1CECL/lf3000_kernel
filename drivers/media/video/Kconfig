@@ -87,6 +87,18 @@ config  VIDEOBUF2_ION
 	  Internal memory management for Video Buffer 2 by ION
 endchoice
 
+config VIDEOBUF2_ION_NXP
+    bool "Video Buffer2 ION helper for NXP"
+    depends on ION_NXP
+    select VIDEOBUF2_CORE
+    select VIDEOBUF2_MEMOPS
+    help
+      Internal memory management for Video Buffer2 by ION
+
+source "drivers/media/video/nexell/Kconfig"
+
+source "drivers/media/video/lf2000/Kconfig"
+
 #
 # Multimedia Video device configuration
 #
@@ -568,6 +580,25 @@ config VIDEO_NOON010PC30
 	---help---
 	  This driver supports NOON010PC30 CIF camera from Siliconfile
 
+config VIDEO_S5K4ECGX
+    tristate "S5K4ECGX 5M pixel camera sensor support"
+    depends on I2C && VIDEO_V4L2
+    ---help---
+      This driver supports s5k4ecgx Soc camera module
+
+config VIDEO_S5K4ECGX_DEBUG
+    bool "S5K4ECGX camera sensor debugging"
+    depends on VIDEO_S5K4ECGX
+    default n
+    ---help---
+      Enable extra debug messages for S5K4ECGX camera driver
+
+config VIDEO_S5K5CAGX
+    tristate "S5K5CAGX 3M pixel camera sensor support"
+    depends on I2C && VIDEO_V4L2
+    ---help---
+      This driver supports s5k5cagx SoC camera module.
+
 config VIDEO_S5K4E5
         tristate "S5K4E5 sensor support"
 	depends on VIDEO_V4L2 && ((VIDEO_FIMC_MIPI || VIDEO_S5P_MIPI_CSIS) && VIDEO_EXYNOS_FIMC_IS) || VIDEO_EXYNOS5_FIMC_IS || VIDEO_EXYNOS5_FIMC_IS2
@@ -709,6 +740,12 @@ config VIDEO_S5K6AA
 	---help---
 	  This is a V4L2 sensor-level driver for Samsung S5K6AA(FX) 1.3M
 	  camera sensor with an embedded SoC image signal processor.
+
+config VIDEO_HI253
+    tristate "Hynix HI253 2M pixel camera sensor support"
+    depends on I2C && VIDEO_V4L2
+    ---help---
+      This driver supports Hynix HI253 SoC camera module for V4L2 Media API.
 
 comment "Flash devices"
 
@@ -1210,6 +1247,12 @@ config SOC_CAMERA_OV9740
 	depends on SOC_CAMERA && I2C
 	help
 	  This is a ov9740 camera driver
+
+config SOC_CAMERA_HI253
+	tristate "hi253 camera support"
+	depends on SOC_CAMERA && I2C
+	help
+	  This is a V4L2 SoC camera driver for Hynix HI253 2MP sensors
 
 config MX1_VIDEO
 	bool

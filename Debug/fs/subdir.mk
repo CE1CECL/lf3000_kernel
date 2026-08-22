@@ -1,0 +1,275 @@
+################################################################################
+# Automatically-generated file. Do not edit!
+################################################################################
+
+# Add inputs and outputs from these tool invocations to the build variables 
+O_SRCS += \
+../fs/aio.o \
+../fs/anon_inodes.o \
+../fs/attr.o \
+../fs/bad_inode.o \
+../fs/binfmt_elf.o \
+../fs/binfmt_script.o \
+../fs/bio.o \
+../fs/block_dev.o \
+../fs/buffer.o \
+../fs/built-in.o \
+../fs/char_dev.o \
+../fs/dcache.o \
+../fs/direct-io.o \
+../fs/drop_caches.o \
+../fs/eventfd.o \
+../fs/eventpoll.o \
+../fs/exec.o \
+../fs/fcntl.o \
+../fs/fifo.o \
+../fs/file.o \
+../fs/file_table.o \
+../fs/filesystems.o \
+../fs/fs-writeback.o \
+../fs/fs_struct.o \
+../fs/generic_acl.o \
+../fs/inode.o \
+../fs/ioctl.o \
+../fs/ioprio.o \
+../fs/libfs.o \
+../fs/locks.o \
+../fs/mbcache.o \
+../fs/mpage.o \
+../fs/namei.o \
+../fs/namespace.o \
+../fs/open.o \
+../fs/pipe.o \
+../fs/pnode.o \
+../fs/posix_acl.o \
+../fs/proc_namespace.o \
+../fs/read_write.o \
+../fs/readdir.o \
+../fs/select.o \
+../fs/seq_file.o \
+../fs/signalfd.o \
+../fs/splice.o \
+../fs/stack.o \
+../fs/stat.o \
+../fs/statfs.o \
+../fs/super.o \
+../fs/sync.o \
+../fs/timerfd.o \
+../fs/utimes.o \
+../fs/xattr.o \
+../fs/xattr_acl.o 
+
+C_SRCS += \
+../fs/aio.c \
+../fs/anon_inodes.c \
+../fs/attr.c \
+../fs/bad_inode.c \
+../fs/binfmt_aout.c \
+../fs/binfmt_elf.c \
+../fs/binfmt_elf_fdpic.c \
+../fs/binfmt_em86.c \
+../fs/binfmt_flat.c \
+../fs/binfmt_misc.c \
+../fs/binfmt_script.c \
+../fs/binfmt_som.c \
+../fs/bio-integrity.c \
+../fs/bio.c \
+../fs/block_dev.c \
+../fs/buffer.c \
+../fs/char_dev.c \
+../fs/compat.c \
+../fs/compat_binfmt_elf.c \
+../fs/compat_ioctl.c \
+../fs/dcache.c \
+../fs/dcookies.c \
+../fs/direct-io.c \
+../fs/drop_caches.c \
+../fs/eventfd.c \
+../fs/eventpoll.c \
+../fs/exec.c \
+../fs/fcntl.c \
+../fs/fhandle.c \
+../fs/fifo.c \
+../fs/file.c \
+../fs/file_table.c \
+../fs/filesystems.c \
+../fs/fs-writeback.c \
+../fs/fs_struct.c \
+../fs/generic_acl.c \
+../fs/inode.c \
+../fs/ioctl.c \
+../fs/ioprio.c \
+../fs/libfs.c \
+../fs/locks.c \
+../fs/mbcache.c \
+../fs/mpage.c \
+../fs/namei.c \
+../fs/namespace.c \
+../fs/no-block.c \
+../fs/open.c \
+../fs/pipe.c \
+../fs/pnode.c \
+../fs/posix_acl.c \
+../fs/proc_namespace.c \
+../fs/read_write.c \
+../fs/readdir.c \
+../fs/select.c \
+../fs/seq_file.c \
+../fs/signalfd.c \
+../fs/splice.c \
+../fs/stack.c \
+../fs/stat.c \
+../fs/statfs.c \
+../fs/super.c \
+../fs/sync.c \
+../fs/timerfd.c \
+../fs/utimes.c \
+../fs/xattr.c \
+../fs/xattr_acl.c 
+
+OBJS += \
+./fs/aio.o \
+./fs/anon_inodes.o \
+./fs/attr.o \
+./fs/bad_inode.o \
+./fs/binfmt_aout.o \
+./fs/binfmt_elf.o \
+./fs/binfmt_elf_fdpic.o \
+./fs/binfmt_em86.o \
+./fs/binfmt_flat.o \
+./fs/binfmt_misc.o \
+./fs/binfmt_script.o \
+./fs/binfmt_som.o \
+./fs/bio-integrity.o \
+./fs/bio.o \
+./fs/block_dev.o \
+./fs/buffer.o \
+./fs/char_dev.o \
+./fs/compat.o \
+./fs/compat_binfmt_elf.o \
+./fs/compat_ioctl.o \
+./fs/dcache.o \
+./fs/dcookies.o \
+./fs/direct-io.o \
+./fs/drop_caches.o \
+./fs/eventfd.o \
+./fs/eventpoll.o \
+./fs/exec.o \
+./fs/fcntl.o \
+./fs/fhandle.o \
+./fs/fifo.o \
+./fs/file.o \
+./fs/file_table.o \
+./fs/filesystems.o \
+./fs/fs-writeback.o \
+./fs/fs_struct.o \
+./fs/generic_acl.o \
+./fs/inode.o \
+./fs/ioctl.o \
+./fs/ioprio.o \
+./fs/libfs.o \
+./fs/locks.o \
+./fs/mbcache.o \
+./fs/mpage.o \
+./fs/namei.o \
+./fs/namespace.o \
+./fs/no-block.o \
+./fs/open.o \
+./fs/pipe.o \
+./fs/pnode.o \
+./fs/posix_acl.o \
+./fs/proc_namespace.o \
+./fs/read_write.o \
+./fs/readdir.o \
+./fs/select.o \
+./fs/seq_file.o \
+./fs/signalfd.o \
+./fs/splice.o \
+./fs/stack.o \
+./fs/stat.o \
+./fs/statfs.o \
+./fs/super.o \
+./fs/sync.o \
+./fs/timerfd.o \
+./fs/utimes.o \
+./fs/xattr.o \
+./fs/xattr_acl.o 
+
+C_DEPS += \
+./fs/aio.d \
+./fs/anon_inodes.d \
+./fs/attr.d \
+./fs/bad_inode.d \
+./fs/binfmt_aout.d \
+./fs/binfmt_elf.d \
+./fs/binfmt_elf_fdpic.d \
+./fs/binfmt_em86.d \
+./fs/binfmt_flat.d \
+./fs/binfmt_misc.d \
+./fs/binfmt_script.d \
+./fs/binfmt_som.d \
+./fs/bio-integrity.d \
+./fs/bio.d \
+./fs/block_dev.d \
+./fs/buffer.d \
+./fs/char_dev.d \
+./fs/compat.d \
+./fs/compat_binfmt_elf.d \
+./fs/compat_ioctl.d \
+./fs/dcache.d \
+./fs/dcookies.d \
+./fs/direct-io.d \
+./fs/drop_caches.d \
+./fs/eventfd.d \
+./fs/eventpoll.d \
+./fs/exec.d \
+./fs/fcntl.d \
+./fs/fhandle.d \
+./fs/fifo.d \
+./fs/file.d \
+./fs/file_table.d \
+./fs/filesystems.d \
+./fs/fs-writeback.d \
+./fs/fs_struct.d \
+./fs/generic_acl.d \
+./fs/inode.d \
+./fs/ioctl.d \
+./fs/ioprio.d \
+./fs/libfs.d \
+./fs/locks.d \
+./fs/mbcache.d \
+./fs/mpage.d \
+./fs/namei.d \
+./fs/namespace.d \
+./fs/no-block.d \
+./fs/open.d \
+./fs/pipe.d \
+./fs/pnode.d \
+./fs/posix_acl.d \
+./fs/proc_namespace.d \
+./fs/read_write.d \
+./fs/readdir.d \
+./fs/select.d \
+./fs/seq_file.d \
+./fs/signalfd.d \
+./fs/splice.d \
+./fs/stack.d \
+./fs/stat.d \
+./fs/statfs.d \
+./fs/super.d \
+./fs/sync.d \
+./fs/timerfd.d \
+./fs/utimes.d \
+./fs/xattr.d \
+./fs/xattr_acl.d 
+
+
+# Each subdirectory must supply rules for building sources it contributes
+fs/%.o: ../fs/%.c
+	@echo 'Building file: $<'
+	@echo 'Invoking: ARM Linux GCC C Compiler'
+	arm-elf-gcc -O0 -Wall -Wa,-adhlns="$@.lst" -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -mcpu=cortex-m4 -mthumb -g3 -gdwarf-2 -o "$@" "$<"
+	@echo 'Finished building: $<'
+	@echo ' '
+
+

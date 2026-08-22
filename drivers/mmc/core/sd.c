@@ -506,6 +506,10 @@ static void sd_update_bus_speed_mode(struct mmc_card *card)
 	}
 }
 
+/* Enable the following #define to generate lots of debug output */
+/*
+#define PM_DEBUG 1
+*/
 static int sd_set_bus_speed_mode(struct mmc_card *card, u8 *status)
 {
 	int err;
@@ -546,6 +550,9 @@ static int sd_set_bus_speed_mode(struct mmc_card *card, u8 *status)
 	else {
 		mmc_set_timing(card->host, timing);
 		mmc_set_clock(card->host, card->sw_caps.uhs_max_dtr);
+#ifdef PM_DEBUG
+printk(KERN_INFO "......from sd_set_bus_speed_mode()\n");
+#endif
 	}
 
 	return 0;
@@ -1019,6 +1026,9 @@ static int mmc_sd_init_card(struct mmc_host *host, u32 ocr,
 		 * Set bus speed.
 		 */
 		mmc_set_clock(host, mmc_sd_get_max_clock(card));
+#ifdef PM_DEBUG
+printk(KERN_INFO "......from mmc_sd_init_card(0x%x)\n", ocr);
+#endif
 
 		/*
 		 * Switch to wider bus (if supported).
@@ -1267,6 +1277,9 @@ int mmc_attach_sd(struct mmc_host *host)
 	}
 
 	host->ocr = mmc_select_voltage(host, ocr);
+#ifdef PM_DEBUG
+printk(KERN_INFO "......from mmc_attach_sd()\n");
+#endif
 
 	/*
 	 * Can we support the voltage(s) of the card(s)?

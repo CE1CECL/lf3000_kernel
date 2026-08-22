@@ -36,6 +36,7 @@
 #define TERMIOS_TERMIO	4
 #define TERMIOS_OLD	8
 
+//#define SERIAL_DEBUG 1
 
 /**
  *	tty_chars_in_buffer	-	characters pending
@@ -243,11 +244,19 @@ speed_t tty_termios_baud_rate(struct ktermios *termios)
 	unsigned int cbaud;
 
 	cbaud = termios->c_cflag & CBAUD;
+#ifdef SERIAL_DEBUG
+		printk(KERN_INFO "tty_termios_baud_rate %d %u %u\n", __LINE__, termios->c_cflag, cbaud);
+#endif
 
 #ifdef BOTHER
 	/* Magic token for arbitrary speed via c_ispeed/c_ospeed */
 	if (cbaud == BOTHER)
+	{
+#ifdef SERIAL_DEBUG
+		printk(KERN_INFO "tty_termios_baud_rate %d %u\n", __LINE__, termios->c_ospeed);
+#endif
 		return termios->c_ospeed;
+	}
 #endif
 	if (cbaud & CBAUDEX) {
 		cbaud &= ~CBAUDEX;
@@ -256,6 +265,9 @@ speed_t tty_termios_baud_rate(struct ktermios *termios)
 			termios->c_cflag &= ~CBAUDEX;
 		else
 			cbaud += 15;
+#ifdef SERIAL_DEBUG
+		printk(KERN_INFO "tty_termios_baud_rate %d %u\n", __LINE__, cbaud);
+#endif
 	}
 	return baud_table[cbaud];
 }

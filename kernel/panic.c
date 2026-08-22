@@ -24,6 +24,11 @@
 #include <linux/nmi.h>
 #include <linux/dmi.h>
 
+#ifdef CONFIG_ARCH_NXP4330
+#include <mach/alive.h>
+#define PANIC_MAX_COUNT 3
+#endif
+
 #define PANIC_TIMER_STEP 100
 #define PANIC_BLINK_SPD 18
 
@@ -80,6 +85,10 @@ void panic(const char *fmt, ...)
 	long i, i_next = 0;
 	int state = 0;
 
+#ifdef CONFIG_ARCH_NXP4330
+        unsigned panic_count;
+#endif
+
 	/*
 	 * It's possible to come here directly from a panic-assertion and
 	 * not have preempt disabled. Some functions called from here want
@@ -105,6 +114,15 @@ void panic(const char *fmt, ...)
 	 */
 	if (!test_taint(TAINT_DIE) && oops_in_progress <= 1)
 		dump_stack();
+#endif
+
+#ifdef CONFIG_NXP4330_LEAPFROG
+        panic_count = alive_get_panic();
+        panic_count++;
+        if(panic_count > PANIC_MAX_COUNT)
+                panic_count = PANIC_MAX_COUNT;
+        alive_set_panic(panic_count);
+        panic_timeout = 1;
 #endif
 
 	/*

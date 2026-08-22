@@ -110,6 +110,8 @@
 #define TTY_PARANOIA_CHECK 1
 #define CHECK_TTY_COUNT 1
 
+//#define SERIAL_DEBUG 1
+
 struct ktermios tty_std_termios = {	/* for the benefit of tty drivers  */
 	.c_iflag = ICRNL | IXON,
 	.c_oflag = OPOST | ONLCR,
@@ -1015,7 +1017,11 @@ static inline ssize_t do_tty_write(
 	ret = tty_write_lock(tty, file->f_flags & O_NDELAY);
 	if (ret < 0)
 		return ret;
-
+		
+#ifdef SERIAL_DEBUG	
+	if (!strcmp(tty->name, "ttyS1"))
+			printk(KERN_INFO "%s:%d %s...\n", __func__,__LINE__, tty->name);
+#endif
 	/*
 	 * We chunk up writes into a temporary buffer. This
 	 * simplifies low-level drivers immensely, since they
@@ -1151,7 +1157,13 @@ static ssize_t tty_write(struct file *file, const char __user *buf,
 	if (!ld->ops->write)
 		ret = -EIO;
 	else
+	{
+#ifdef SERIAL_DEBUG
+		if (!strcmp(tty->name, "ttyS1"))
+			printk(KERN_INFO "%s: writing to %s...\n", __func__, tty->name);
+#endif
 		ret = do_tty_write(ld->ops->write, tty, file, buf, count);
+	}
 	tty_ldisc_deref(ld);
 	return ret;
 }
@@ -1955,7 +1967,8 @@ retry_open:
 	    tty->driver->subtype == PTY_TYPE_MASTER)
 		noctty = 1;
 #ifdef TTY_DEBUG_HANGUP
-	printk(KERN_DEBUG "%s: opening %s...\n", __func__, tty->name);
+	if (!strcmp(tty->name, "ttyS1"))
+		printk(KERN_INFO "%s: opening %s...\n", __func__, tty->name);
 #endif
 	if (tty->ops->open)
 		retval = tty->ops->open(tty, filp);

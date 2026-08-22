@@ -1,0 +1,6 @@
+#
+# Copyright 2009 Nexell.
+#
+# Configuration options for the Nexell Display
+
+comment "Nexell Graphic Device"

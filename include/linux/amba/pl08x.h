@@ -140,6 +140,9 @@ struct pl08x_txd {
 	 * trigger this txd.  Other registers are in llis_va[0].
 	 */
 	u32 ccfg;
+
+	/* for cyclic, by jhkim */
+	bool cyclic;
 };
 
 /**

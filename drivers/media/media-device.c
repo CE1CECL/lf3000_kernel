@@ -181,6 +181,7 @@ static long media_device_setup_link(struct media_device *mdev,
 	struct media_entity *sink;
 	int ret;
 
+    int pi = 0;
 	if (copy_from_user(&ulink, _ulink, sizeof(ulink)))
 		return -EFAULT;
 

@@ -139,7 +139,7 @@ int dma_buf_fd(struct dma_buf *dmabuf, int flags)
 	if (!dmabuf || !dmabuf->file)
 		return -EINVAL;
 
-	error = get_unused_fd_flags(flags);
+	error = alloc_fd(3, flags);
 	if (error < 0)
 		return error;
 	fd = error;

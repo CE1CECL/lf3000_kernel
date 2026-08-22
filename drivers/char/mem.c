@@ -741,7 +741,12 @@ static loff_t memory_lseek(struct file *file, loff_t offset, int orig)
 #if defined(CONFIG_DEVMEM) || defined(CONFIG_DEVKMEM) || defined(CONFIG_DEVPORT)
 static int open_port(struct inode * inode, struct file * filp)
 {
+    /* psw0523 fix for gralloc open fail */
+#if defined(CONFIG_ANDROID)
+    return 0;
+#else
 	return capable(CAP_SYS_RAWIO) ? 0 : -EPERM;
+#endif
 }
 #endif
 

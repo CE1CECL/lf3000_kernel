@@ -762,10 +762,17 @@ static void dw_mci_submit_data(struct dw_mci *host, struct mmc_data *data)
 
 	if (card && mmc_card_sdio(card)) {
 		unsigned int rxwmark_val, msize_val, i;
+// +++
+/* mod by insignal */
+#if defined(CONFIG_MMC_NEXELL) || defined(CONFIG_MMC_NEXELL_MODULE)
+		unsigned int msize[4] = {1, 4, 8, 16};
+#else
 		unsigned int msize[8] = {1, 4, 8, 16, 32, 64, 128, 256};
+#endif
+// ---
 
-		for (i = 1; sizeof(msize) / sizeof(unsigned int); i++) {
-			if ((data->blksz / 4) % msize[i] == 0)
+		for (i = 1; i < (sizeof(msize) / sizeof(unsigned int)); i++) {
+			if (((data->blksz / 4) % msize[i - 1] == 0) && (i < 4))
 				continue;
 			else
 				break;
@@ -830,15 +837,27 @@ static void dw_mci_submit_data(struct dw_mci *host, struct mmc_data *data)
 	}
 }
 
+/* Enable the following #define to generate lots of debug output */
+/*
+#define PM_DEBUG 1
+*/
 static void dw_mci_setup_bus(struct dw_mci_slot *slot, int force)
 {
 	struct dw_mci *host = slot->host;
 	u32 div, actual_speed;
 	bool reset_div = false;
-
+	
 	if ((slot->clock != host->current_speed) || force) {
+#ifdef PM_DEBUG
+printk(KERN_INFO "dw_mci_setup_bus: slot 0x%x, host 0x%x\n",
+	(u32)slot, (u32)host);
+#endif	/* PM_DEBUG */
 		do {
 			div = host->bus_hz / slot->clock;
+#ifdef PM_DEBUG
+			dev_info(&slot->mmc->class_dev, "current_speed = %u bus_hz = %u slot_clock = %u "
+				"div = %u \n", host->current_speed, host->bus_hz, slot->clock, div);
+#endif	/* PM_DEBUG */
 			if ((host->bus_hz % slot->clock) &&
 				(host->bus_hz > slot->clock))
 				/*
@@ -849,7 +868,10 @@ static void dw_mci_setup_bus(struct dw_mci_slot *slot, int force)
 
 			div = (host->bus_hz != slot->clock) ?
 				DIV_ROUND_UP(div, 2) : 0;
-
+#ifdef PM_DEBUG
+			dev_info(&slot->mmc->class_dev, "bus_hz = %u,  slot_clock = %u, "
+				"div = %u \n", host->bus_hz, slot->clock, div);
+#endif	/* PM_DEBUG */
 			/* CLKDIV limitation is 0xFF */
 			if (div > 0xFF)
 				div = 0xFF;
@@ -865,15 +887,20 @@ static void dw_mci_setup_bus(struct dw_mci_slot *slot, int force)
 					"Source clock is needed to change\n");
 				reset_div = true;
 				slot->host->pdata->set_io_timing(slot->host, MMC_TIMING_LEGACY);
+#ifdef PM_DEBUG
+				dev_info(&slot->mmc->class_dev, "actual speed = %u reset_div = %u div = %u \n", 
+					actual_speed, reset_div, div);
+#endif
 			} else
 				reset_div = false;
 		} while(reset_div);
 
+#ifdef PM_DEBUG
 		dev_info(&slot->mmc->class_dev,
 			 "Bus speed (slot %d) = %dHz (slot req %dHz, actual %dHZ"
 			 " div = %d)\n", slot->id, host->bus_hz, slot->clock,
 			 div ? ((host->bus_hz / div) >> 1) : host->bus_hz, div);
-
+#endif
 		/* disable clock */
 		mci_writel(host, CLKENA, 0);
 		mci_writel(host, CLKSRC, 0);
@@ -883,7 +910,18 @@ static void dw_mci_setup_bus(struct dw_mci_slot *slot, int force)
 			     SDMMC_CMD_UPD_CLK | SDMMC_CMD_PRV_DAT_WAIT, 0);
 
 		/* set clock to desired speed */
-		mci_writel(host, CLKDIV, div);
+
+		/* FIXME Setting the CLKDIV to div-1 configures the CLK to run at 50MHz 
+		   This is the speed we want to run at and seems to resolve the wifi failure issue 
+		   but saw failures with eMMC. Setting it back to run at 25MHz till we resolve the 
+		   eMMC issue  	*/
+
+		/**/mci_writel(host, CLKDIV, div-1);	//50MHz
+		//mci_writel(host, CLKDIV, div);		// 25MHz	
+#ifdef PM_DEBUG
+		dev_info(&slot->mmc->class_dev, "wrote 0x%x to CLKDIV\n", 
+			 mci_readl(host, CLKDIV));
+#endif
 
 		/* inform CIU */
 		mci_send_cmd(slot,
@@ -898,10 +936,16 @@ static void dw_mci_setup_bus(struct dw_mci_slot *slot, int force)
 			     SDMMC_CMD_UPD_CLK | SDMMC_CMD_PRV_DAT_WAIT, 0);
 
 		host->current_speed = slot->clock;
+#ifdef PM_DEBUG
+		dev_info(&slot->mmc->class_dev, "current_speed = %u clock = %u \n",
+			host->current_speed, slot->clock);	
+#endif
 	}
 
 	/* Set the current slot bus width */
 	mci_writel(host, CTYPE, (slot->ctype << slot->id));
+	//dev_info(&slot->mmc->class_dev, "CTYPE:\t0x%08x\n", mci_readl(host, CTYPE));
+	//dev_info(&slot->mmc->class_dev, "CLKDIV:\t0x%08x\n", mci_readl(host, CLKDIV));
 }
 
 static void __dw_mci_start_request(struct dw_mci *host,
@@ -1086,6 +1130,12 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 
 	mci_writel(slot->host, UHS_REG, regs);
 
+#ifdef PM_DEBUG
+	dev_info(&slot->mmc->class_dev, 
+		 "dw_mci_set_ios: wrote 0x%x to UHS_REG; ios->timing %d, "
+		 "ios->clock %d, width %d\n", 
+		 regs, ios->timing, ios->clock, width);
+#endif
 	if (ios->clock) {
 		/*
 		 * Use mirror of ios->clock to prevent race with mmc
@@ -1097,6 +1147,9 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	switch (ios->power_mode) {
 	case MMC_POWER_UP:
 		set_bit(DW_MMC_CARD_NEED_INIT, &slot->flags);
+		/* Power up slot */
+		if (slot->host->pdata->setpower)
+			slot->host->pdata->setpower(slot->id, 1);
 		break;
 	case MMC_POWER_ON:
 		/* To cheat supporting hardware reset using power off/on
@@ -1106,12 +1159,21 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 			slot->host->quirks & DW_MMC_QUIRK_HW_RESET_PW)
 			mmc->card->ext_csd.rst_n_function |= EXT_CSD_RST_N_ENABLED;
 		break;
+	case MMC_POWER_OFF:	
+		/* Power down slot */
+		if (slot->host->pdata->setpower)
+			slot->host->pdata->setpower(slot->id, 0);
 	default:
 		break;
 	}
 
 	if (brd->cfg_gpio)
 		brd->cfg_gpio(width);
+		
+#ifdef PM_DEBUG
+	printk(KERN_INFO "CLKSEL = 0x%08x\n", mci_readl(slot->host, CLKSEL));
+	printk(KERN_INFO "UHS_REG = 0x%08x\n", mci_readl(slot->host, UHS_REG));
+#endif
 }
 
 static int dw_mci_get_ro(struct mmc_host *mmc)
@@ -1147,11 +1209,6 @@ static int dw_mci_get_cd(struct mmc_host *mmc)
 	else
 		present = (mci_readl(slot->host, CDETECT) & (1 << slot->id))
 			== 0 ? 1 : 0;
-
-	if (present)
-		dev_dbg(&mmc->class_dev, "card is present\n");
-	else
-		dev_dbg(&mmc->class_dev, "card is not present\n");
 
 	return present;
 }
@@ -2310,6 +2367,7 @@ static int __devinit dw_mci_init_slot(struct dw_mci *host, unsigned int id)
 	slot->id = id;
 	slot->mmc = mmc;
 	slot->host = host;
+	host->slot[id] = slot;	/* add by jhkim */
 
 	mmc->ops = &dw_mci_ops;
 	mmc->f_min = DIV_ROUND_UP(host->bus_hz, 510);
@@ -2504,6 +2562,13 @@ static void dw_mci_timeout_timer(unsigned long data)
 	if (host && host->mrq) {
 		mrq = host->mrq;
 
+#if 1	/* 27apr14 */
+		printk(KERN_INFO "dw_mci_timeout_timer():\n  "
+			"Timeout waiting for hardware interrupt\n  "
+			"cmd%d, state: %d, retries %d, \n  status: %08X, rintsts: %08X\n",
+			mrq->cmd->opcode, host->state,mrq->cmd->retries,
+			mci_readl(host, STATUS), mci_readl(host, RINTSTS));
+#endif	/* 27apr14 */
 		dev_err(&host->dev,
 			"Timeout waiting for hardware interrupt\n"
 			"cmd%d, state: %d, status: %08X, rintsts: %08X\n",
@@ -2654,8 +2719,16 @@ int __devinit dw_mci_probe(struct dw_mci *host)
 		fifo_size = host->pdata->fifo_depth;
 	}
 	host->fifo_depth = fifo_size;
+// +++
+/* mod by insignal */
+#if defined(CONFIG_MMC_NEXELL) || defined(CONFIG_MMC_NEXELL_MODULE)
+	host->fifoth_val = ((0x2 << 28) | ((fifo_size/2 - 1) << 16) |
+			((fifo_size/2) << 0));
+#else
 	host->fifoth_val = ((0x4 << 28) | ((fifo_size/4 - 1) << 16) |
 			((fifo_size/2) << 0));
+#endif
+// ---
 	mci_writel(host, FIFOTH, host->fifoth_val);
 
 	/* disable clock to CIU */
@@ -2723,6 +2796,13 @@ int __devinit dw_mci_probe(struct dw_mci *host)
 		 host->irq, width, fifo_size);
 	if (host->quirks & DW_MCI_QUIRK_IDMAC_DTO)
 		dev_info(&host->dev, "Internal DMAC interrupt fix enabled.\n");
+		
+	//dev_info(&host->dev, "STATUS:\t0x%08x\n", mci_readl(host, STATUS));
+	//dev_info(&host->dev, "RINTSTS:\t0x%08x\n", mci_readl(host, RINTSTS));
+	//dev_info(&host->dev, "CMD:\t0x%08x\n", mci_readl(host, CMD));
+	//dev_info(&host->dev, "CTRL:\t0x%08x\n", mci_readl(host, CTRL));
+	//dev_info(&host->dev, "INTMASK:\t0x%08x\n", mci_readl(host, INTMASK));
+	//dev_info(&host->dev, "TMOUT:\t0x%08x\n", mci_readl(host, TMOUT));
 
 	return 0;
 

@@ -14,6 +14,7 @@
 #include <linux/mmc/card.h>
 #include <linux/mmc/sdio.h>
 #include <linux/mmc/sdio_func.h>
+#include <linux/delay.h>
 
 #include "sdio_ops.h"
 
@@ -73,21 +74,28 @@ int sdio_enable_func(struct sdio_func *func)
 
 	reg |= 1 << func->num;
 
+	mdelay(1);
+
 	ret = mmc_io_rw_direct(func->card, 1, 0, SDIO_CCCR_IOEx, reg, NULL);
 	if (ret)
 		goto err;
 
 	timeout = jiffies + msecs_to_jiffies(func->enable_timeout);
 
+	mdelay(1);
 	while (1) {
 		ret = mmc_io_rw_direct(func->card, 0, 0, SDIO_CCCR_IORx, 0, &reg);
-		if (ret)
+		if (ret) {
+			printk("\n %s : mmc_io_rw_direct : SDIO_CCCR_IORx", __func__);
 			goto err;
+		}
 		if (reg & (1 << func->num))
 			break;
 		ret = -ETIME;
-		if (time_after(jiffies, timeout))
+		if (time_after(jiffies, timeout)){
+			printk("\n %s : timeout ", __func__); 
 			goto err;
+		}
 	}
 
 	pr_debug("SDIO: Enabled device %s\n", sdio_func_id(func));
@@ -95,6 +103,7 @@ int sdio_enable_func(struct sdio_func *func)
 	return 0;
 
 err:
+	printk("\n %s : err ", __func__); 
 	pr_debug("SDIO: Failed to enable device %s\n", sdio_func_id(func));
 	return ret;
 }

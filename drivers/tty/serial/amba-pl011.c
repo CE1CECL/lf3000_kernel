@@ -70,6 +70,8 @@
 
 #define UART_WA_SAVE_NR 14
 
+//#define SERIAL_DEBUG 1
+
 static void pl011_lockup_wa(unsigned long data);
 static const u32 uart_wa_reg[UART_WA_SAVE_NR] = {
 	ST_UART011_DMAWM,
@@ -172,6 +174,32 @@ struct uart_amba_port {
 	struct pl011_dmatx_data	dmatx;
 #endif
 };
+
+#ifdef SERIAL_DEBUG
+static void print_port_registers(struct uart_amba_port *uap)
+{
+	printk(KERN_INFO "\nUART PORT %d \n", uap->port.line);
+	printk(KERN_INFO "UART01x_DR = 0x%08x \n", readw(uap->port.membase + UART01x_DR));
+	printk(KERN_INFO "UART01x_RSR = 0x%08x \n", readw(uap->port.membase + UART01x_RSR));
+	//printk(KERN_INFO "UART010_LCRM = 0x%08x \n", readw(uap->port.membase + UART010_LCRM));
+	//printk(KERN_INFO "UART010_LCRL = 0x%08x \n", readw(uap->port.membase + UART010_LCRL));
+	printk(KERN_INFO "UART01x_FR = 0x%08x \n", readw(uap->port.membase + UART01x_FR));
+	//printk(KERN_INFO "UART010_IIR = 0x%08x \n", readw(uap->port.membase + UART010_IIR));
+	//printk(KERN_INFO "UART010_ICR = 0x%08x \n", readw(uap->port.membase + UART010_ICR));
+	//printk(KERN_INFO "UART01x_ILPR = 0x%08x \n", readw(uap->port.membase + UART01x_ILPR));
+	printk(KERN_INFO "UART011_IBRD = 0x%08x \n", readw(uap->port.membase + UART011_IBRD));
+	printk(KERN_INFO "UART011_FBRD = 0x%08x \n", readw(uap->port.membase + UART011_FBRD));
+	printk(KERN_INFO "UART011_LCRH = 0x%08x \n", readw(uap->port.membase + UART011_LCRH));
+	printk(KERN_INFO "UART011_CR = 0x%08x \n", readw(uap->port.membase + UART011_CR));
+	printk(KERN_INFO "UART011_IFLS = 0x%08x \n", readw(uap->port.membase + UART011_IFLS));
+	printk(KERN_INFO "UART011_IMSC = 0x%08x \n", readw(uap->port.membase + UART011_IMSC));
+	printk(KERN_INFO "UART011_RIS = 0x%08x \n", readw(uap->port.membase + UART011_RIS));
+	printk(KERN_INFO "UART011_MIS = 0x%08x \n", readw(uap->port.membase + UART011_MIS));
+	printk(KERN_INFO "UART011_ICR = 0x%08x \n", readw(uap->port.membase + UART011_ICR));
+	//printk(KERN_INFO "UART011_DMACR = 0x%08x \n", readw(uap->port.membase + UART011_DMACR));
+	printk(KERN_INFO "\n\n");
+}
+#endif
 
 /*
  * Reads up to 256 characters from the FIFO or until it's empty and
@@ -1076,7 +1104,7 @@ static void pl011_lockup_wa(unsigned long data)
 	struct tty_struct *tty = uap->port.state->port.tty;
 	int buf_empty_retries = 200;
 	int loop;
-
+	
 	/* Stop HCI layer from submitting data for tx */
 	tty->hw_stopped = 1;
 	while (!uart_circ_empty(xmit)) {
@@ -1119,8 +1147,11 @@ static void pl011_lockup_wa(unsigned long data)
 
 static void pl011_stop_tx(struct uart_port *port)
 {
-	struct uart_amba_port *uap = (struct uart_amba_port *)port;
-
+#ifdef SERIAL_DEBUG
+	if (port->line == 1)	
+		printk(KERN_INFO "pl011_stop_tx %d\n", __LINE__);
+#endif
+	struct uart_amba_port *uap = (struct uart_amba_port *)port;	
 	uap->im &= ~UART011_TXIM;
 	writew(uap->im, uap->port.membase + UART011_IMSC);
 	pl011_dma_tx_stop(uap);
@@ -1129,11 +1160,21 @@ static void pl011_stop_tx(struct uart_port *port)
 static void pl011_start_tx(struct uart_port *port)
 {
 	struct uart_amba_port *uap = (struct uart_amba_port *)port;
+	unsigned int old_cr;
 
 	if (!pl011_dma_tx_start(uap)) {
 		uap->im |= UART011_TXIM;
 		writew(uap->im, uap->port.membase + UART011_IMSC);
 	}
+	if (port->line == 1) {
+		old_cr = readw(uap->port.membase + UART011_CR);
+		old_cr &= ~(UART011_CR_RTS | UART011_CR_DTR);
+		writew(old_cr, uap->port.membase + UART011_CR);
+#ifdef SERIAL_DEBUG
+		printk(KERN_INFO "pl011_start_tx %d %u\n", __LINE__, pl011_dma_tx_start(uap));
+		print_port_registers(uap);
+#endif	
+	}	
 }
 
 static void pl011_stop_rx(struct uart_port *port)
@@ -1158,7 +1199,7 @@ static void pl011_enable_ms(struct uart_port *port)
 static void pl011_rx_chars(struct uart_amba_port *uap)
 {
 	struct tty_struct *tty = uap->port.state->port.tty;
-
+	
 	pl011_fifo_to_tty(uap);
 
 	spin_unlock(&uap->port.lock);
@@ -1249,6 +1290,12 @@ static irqreturn_t pl011_int(int irq, void *dev_id)
 	spin_lock_irqsave(&uap->port.lock, flags);
 
 	status = readw(uap->port.membase + UART011_MIS);
+	
+#ifdef SERIAL_DEBUG 
+	if(uap->port.line == 1)
+		printk(KERN_INFO "pl011_int status=%u \n", status);
+#endif 
+
 	if (status) {
 		do {
 			writew(status & ~(UART011_TXIS|UART011_RTIS|
@@ -1286,6 +1333,7 @@ static irqreturn_t pl011_int(int irq, void *dev_id)
 static unsigned int pl01x_tx_empty(struct uart_port *port)
 {
 	struct uart_amba_port *uap = (struct uart_amba_port *)port;
+
 	unsigned int status = readw(uap->port.membase + UART01x_FR);
 	return status & (UART01x_FR_BUSY|UART01x_FR_TXFF) ? 0 : TIOCSER_TEMT;
 }
@@ -1383,6 +1431,10 @@ static int pl011_startup(struct uart_port *port)
 	struct uart_amba_port *uap = (struct uart_amba_port *)port;
 	unsigned int cr;
 	int retval;
+	
+#ifdef SERIAL_DEBUG	
+	printk(KERN_INFO "pl011_startup %d\n", __LINE__);
+#endif
 
 	retval = clk_prepare(uap->clk);
 	if (retval)
@@ -1396,6 +1448,16 @@ static int pl011_startup(struct uart_port *port)
 		goto clk_unprep;
 
 	uap->port.uartclk = clk_get_rate(uap->clk);
+	
+	if (uap->port.dev->platform_data) {
+		struct amba_pl011_data *plat;
+
+		plat = uap->port.dev->platform_data;
+		if (plat->init)
+		{
+			plat->init();
+		}
+	}
 
 	/* Clear pending error and receive interrupts */
 	writew(UART011_OEIS | UART011_BEIS | UART011_PEIS | UART011_FEIS |
@@ -1408,6 +1470,12 @@ static int pl011_startup(struct uart_port *port)
 	if (retval)
 		goto clk_dis;
 
+//#ifdef SERIAL_DEBUG	
+	//printk(KERN_INFO "pl011_startup %d\n", __LINE__);
+	//print_port_registers(uap);
+	//printk(KERN_INFO "\n\n");
+//#endif
+
 	writew(uap->vendor->ifls, uap->port.membase + UART011_IFLS);
 
 	/*
@@ -1418,6 +1486,7 @@ static int pl011_startup(struct uart_port *port)
 	writew(0, uap->port.membase + UART011_FBRD);
 	writew(1, uap->port.membase + UART011_IBRD);
 	writew(0, uap->port.membase + uap->lcrh_rx);
+	
 	if (uap->lcrh_tx != uap->lcrh_rx) {
 		int i;
 		/*
@@ -1428,13 +1497,22 @@ static int pl011_startup(struct uart_port *port)
 			writew(0xff, uap->port.membase + UART011_MIS);
 		writew(0, uap->port.membase + uap->lcrh_tx);
 	}
+	
 	writew(0, uap->port.membase + UART01x_DR);
+
 	while (readw(uap->port.membase + UART01x_FR) & UART01x_FR_BUSY)
+	{	
+		//readw(uap->port.membase + UART01x_DR);
+		//print_port_registers(uap);
 		barrier();
+	}
 
 	/* restore RTS and DTR */
 	cr = uap->old_cr & (UART011_CR_RTS | UART011_CR_DTR);
-	cr |= UART01x_CR_UARTEN | UART011_CR_RXE | UART011_CR_TXE;
+	if(uap->port.line == 1)
+		cr = UART01x_CR_UARTEN | UART011_CR_TXE | UART011_CR_RXE | UART011_CR_CTSEN | UART011_CR_RTSEN;
+	else
+		cr = UART01x_CR_UARTEN | UART011_CR_TXE | UART011_CR_RXE;
 	writew(cr, uap->port.membase + UART011_CR);
 
 	/*
@@ -1454,20 +1532,28 @@ static int pl011_startup(struct uart_port *port)
 	/* Clear out any spuriously appearing RX interrupts */
 	 writew(UART011_RTIS | UART011_RXIS,
 		uap->port.membase + UART011_ICR);
-	uap->im = UART011_RTIM;
+	//if (uap->port.line != 1)
+		uap->im = UART011_RTIM;
 	if (!pl011_dma_rx_running(uap))
 		uap->im |= UART011_RXIM;
 	writew(uap->im, uap->port.membase + UART011_IMSC);
 	spin_unlock_irq(&uap->port.lock);
 
-	if (uap->port.dev->platform_data) {
-		struct amba_pl011_data *plat;
+	//if (uap->port.dev->platform_data) {
+		//printk(KERN_INFO "pl011_startup %d\n", __LINE__);
+		//struct amba_pl011_data *plat;
 
-		plat = uap->port.dev->platform_data;
-		if (plat->init)
-			plat->init();
-	}
-
+		//plat = uap->port.dev->platform_data;
+		//if (plat->init)
+		//{
+			//printk(KERN_INFO "pl011_startup %d\n", __LINE__);
+			//plat->init();
+		//}
+	//}
+	
+#ifdef SERIAL_DEBUG
+	printk(KERN_INFO "pl011_startup %d\n", __LINE__);
+#endif
 	return 0;
 
  clk_dis:
@@ -1553,12 +1639,23 @@ pl011_set_termios(struct uart_port *port, struct ktermios *termios,
 	unsigned int lcr_h, old_cr;
 	unsigned long flags;
 	unsigned int baud, quot, clkdiv;
+		
+	/* SP 02052014 HACKS!!! */	
+	uap->port.uartclk = clk_get_rate(uap->clk);
+	if (uap->port.line == 1)
+	{
+		termios->c_cflag = 7346;
+		termios->c_cflag |= CRTSCTS;
+	}
 
 	if (uap->vendor->oversampling)
 		clkdiv = 8;
 	else
 		clkdiv = 16;
 
+#ifdef SERIAL_DEBUG
+	printk(KERN_INFO "pl011_set_termios %d %u\n", __LINE__, uap->port.uartclk);
+#endif
 	/*
 	 * Ask the core to calculate the divisor for us.
 	 */
@@ -1888,7 +1985,7 @@ static int __init pl011_console_setup(struct console *co, char *options)
 
 static struct uart_driver amba_reg;
 static struct console amba_console = {
-	.name		= "ttyAMA",
+	.name		= "ttyS",
 	.write		= pl011_console_write,
 	.device		= uart_console_device,
 	.setup		= pl011_console_setup,
@@ -1904,8 +2001,8 @@ static struct console amba_console = {
 
 static struct uart_driver amba_reg = {
 	.owner			= THIS_MODULE,
-	.driver_name		= "ttyAMA",
-	.dev_name		= "ttyAMA",
+	.driver_name		= "ttyS",
+	.dev_name		= "ttyS",
 	.major			= SERIAL_AMBA_MAJOR,
 	.minor			= SERIAL_AMBA_MINOR,
 	.nr			= UART_NR,
@@ -1945,7 +2042,7 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
 		ret = PTR_ERR(uap->clk);
 		goto unmap;
 	}
-
+	
 	uap->vendor = vendor;
 	uap->lcrh_rx = vendor->lcrh_rx;
 	uap->lcrh_tx = vendor->lcrh_tx;
@@ -1959,8 +2056,13 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
 	uap->port.irq = dev->irq[0];
 	uap->port.fifosize = uap->fifosize;
 	uap->port.ops = &amba_pl011_pops;
-	uap->port.flags = UPF_BOOT_AUTOCONF;
+	uap->port.flags = UPF_BOOT_AUTOCONF | UPF_SPD_VHI;
 	uap->port.line = i;
+
+#ifdef SERIAL_DEBUG
+	printk(KERN_INFO "%s: membase = %x flags = %u line=%u\n", dev_name(uap->port.dev), uap->port.membase, uap->port.flags, uap->port.line);
+#endif
+
 	pl011_dma_probe(uap);
 
 	/* Ensure interrupts from this UART are masked and cleared */
@@ -1972,7 +2074,8 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
 	amba_ports[i] = uap;
 
 	amba_set_drvdata(dev, uap);
-	ret = uart_add_one_port(&amba_reg, &uap->port);
+
+	ret = uart_add_one_port(&amba_reg, &uap->port); //SP01312014 - This changes CR and FRBD registers
 	if (ret) {
 		amba_set_drvdata(dev, NULL);
 		amba_ports[i] = NULL;
@@ -1984,6 +2087,13 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
 		kfree(uap);
 	}
  out:
+#ifdef SERIAL_DEBUG
+	if (uap->port.line == 1)
+	{
+		printk(KERN_INFO "UART%d At the end of the probe\n", uap->port.line);
+		print_port_registers(uap);
+	}
+#endif
 	return ret;
 }
 

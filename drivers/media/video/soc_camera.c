@@ -16,6 +16,8 @@
  * published by the Free Software Foundation.
  */
 
+#define DEBUG
+
 #include <linux/device.h>
 #include <linux/err.h>
 #include <linux/i2c.h>
@@ -932,6 +934,41 @@ static int soc_camera_g_chip_ident(struct file *file, void *fh,
 	return v4l2_subdev_call(sd, core, g_chip_ident, id);
 }
 
+static int soc_camera_overlay(struct file *file, void *fh, unsigned int enable)
+{
+	struct soc_camera_device *icd = file->private_data;
+	struct soc_camera_host *ici = to_soc_camera_host(icd->parent);
+
+	if (ici->ops->overlay)
+		return ici->ops->overlay(ici, enable);
+
+	return -ENOIOCTLCMD;
+}
+
+static int soc_camera_g_fbuf(struct file *file, void *fh,
+				struct v4l2_framebuffer *fb)
+{
+	struct soc_camera_device *icd = file->private_data;
+	struct soc_camera_host *ici = to_soc_camera_host(icd->parent);
+
+	if (ici->ops->get_fbuf)
+		return ici->ops->get_fbuf(ici, fb);
+
+	return -ENOIOCTLCMD;
+}
+
+static int soc_camera_s_fbuf(struct file *file, void *fh,
+				struct v4l2_framebuffer *fb)
+{
+	struct soc_camera_device *icd = file->private_data;
+	struct soc_camera_host *ici = to_soc_camera_host(icd->parent);
+
+	if (ici->ops->set_fbuf)
+		return ici->ops->set_fbuf(ici, fb);
+
+	return -ENOIOCTLCMD;
+}
+
 #ifdef CONFIG_VIDEO_ADV_DEBUG
 static int soc_camera_g_register(struct file *file, void *fh,
 				 struct v4l2_dbg_register *reg)
@@ -1035,7 +1072,7 @@ static int soc_camera_probe(struct soc_camera_device *icd)
 	struct v4l2_mbus_framefmt mf;
 	int ret;
 
-	dev_info(icd->pdev, "Probing %s\n", dev_name(icd->pdev));
+	dev_info(icd->pdev, "%s: Probing %s\n", __FUNCTION__, dev_name(icd->pdev));
 
 	/*
 	 * Currently the subdev with the largest number of controls (13) is
@@ -1405,6 +1442,9 @@ static const struct v4l2_ioctl_ops soc_camera_ioctl_ops = {
 	.vidioc_g_parm		 = soc_camera_g_parm,
 	.vidioc_s_parm		 = soc_camera_s_parm,
 	.vidioc_g_chip_ident     = soc_camera_g_chip_ident,
+	.vidioc_overlay		 = soc_camera_overlay,
+	.vidioc_g_fbuf		 = soc_camera_g_fbuf,
+	.vidioc_s_fbuf		 = soc_camera_s_fbuf,
 #ifdef CONFIG_VIDEO_ADV_DEBUG
 	.vidioc_g_register	 = soc_camera_g_register,
 	.vidioc_s_register	 = soc_camera_s_register,
@@ -1431,6 +1471,9 @@ static int video_dev_create(struct soc_camera_device *icd)
 	vdev->lock		= &icd->video_lock;
 
 	icd->vdev = vdev;
+
+	dev_dbg(icd->pdev, "%s: vdev=%p, icd=%p, ctrl_handler=%p\n",
+		__FUNCTION__, vdev, icd, vdev->ctrl_handler);
 
 	return 0;
 }
