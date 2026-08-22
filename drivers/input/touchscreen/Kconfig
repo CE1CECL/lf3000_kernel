@@ -985,6 +985,13 @@ config TOUCHSCREEN_ELAN_KTF2K_7INCH
 
 	  If unsure, say N.
 
+config TOUCHSCREEN_LF2000
+	tristate "Leapfrog adc touchscreen"
+	depends on ARCH_CPU_NEXELL
+	help
+	  Say Y here to enable the driver for adc touchscreen on a
+	  Leapfrog E2K/M2K board.
+
 endif
 
 

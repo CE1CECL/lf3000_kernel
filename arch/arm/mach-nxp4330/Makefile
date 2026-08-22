@@ -8,6 +8,7 @@ obj-$(CONFIG_PLAT_NXP4330_R3K) += board.o device.o flash.o
 obj-$(CONFIG_PLAT_NXP4330_CABO) += board.o device.o flash.o devices.o alive.o
 obj-$(CONFIG_PLAT_NXP4330_GLASGOW_ALPHA) += board.o device.o flash.o alive.o
 obj-$(CONFIG_PLAT_NXP4330_XANADU) += board.o device.o flash.o devices.o alive.o
+obj-$(CONFIG_PLAT_NXP4330_LOWCOST) += board.o device.o flash.o devices.o alive.o
 
 ifeq ($(CONFIG_PLAT_NXP4330_R3K),y)
 obj-$(CONFIG_ION_NXP) += dev-ion.o
@@ -22,6 +23,10 @@ obj-$(CONFIG_ION_NXP) += dev-ion.o
 endif
 
 ifeq ($(CONFIG_PLAT_NXP4330_XANADU),y)
+obj-$(CONFIG_ION_NXP) += dev-ion.o
+endif
+
+ifeq ($(CONFIG_PLAT_NXP4330_LOWCOST),y)
 obj-$(CONFIG_ION_NXP) += dev-ion.o
 endif
 

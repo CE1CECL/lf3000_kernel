@@ -80,8 +80,7 @@
 
 static const char dwc_otg_hcd_name[] = "dwc_otg_hcd";
 
-// psw0523 fix
-//extern bool fiq_fix_enable;
+extern bool fiq_fix_enable;
 
 /** @name Linux HC Driver API Functions */
 /** @{ */
@@ -113,26 +112,251 @@ extern int hub_status_data(struct usb_hcd *hcd, char *buf);
 extern int hub_control(struct usb_hcd *hcd,
 		       u16 typeReq,
 		       u16 wValue, u16 wIndex, char *buf, u16 wLength);
-// psw0523 add
-#ifdef CONFIG_PM
-int dwc_otg_hcd_bus_suspend(struct usb_hcd *hcd)
-{
-    printk("%s\n", __func__);
-    return 0;
-}
-
-int dwc_otg_hcd_bus_resume(struct usb_hcd *hcd)
-{
-    printk("%s\n", __func__);
-    return 0;
-}
-#endif
 
 struct wrapper_priv_data {
 	dwc_otg_hcd_t *dwc_otg_hcd;
 };
 
 /** @} */
+#if defined(CONFIG_PM) && defined(CONFIG_ARCH_CPU_NEXELL)
+static dwc_otg_core_global_regs_t save_global_regs = {0, };
+
+static inline dwc_otg_hcd_t *hcd_to_dwc_otg_hcd(struct usb_hcd *hcd);
+extern void otg_clk_disable(void);
+
+static void dwc_otg_driver_suspend_regs(dwc_otg_core_if_t *core_if, int suspend)
+{
+    dwc_otg_core_global_regs_t *global_regs = core_if->core_global_regs;
+	dwc_otg_core_global_regs_t *regs = &save_global_regs;
+	int i = 0;
+
+	if (suspend) {
+		regs->gotgctl = DWC_READ_REG32(&global_regs->gotgctl);
+		regs->gotgint = DWC_READ_REG32(&global_regs->gotgint);
+		regs->gahbcfg = DWC_READ_REG32(&global_regs->gahbcfg);
+		regs->gusbcfg = DWC_READ_REG32(&global_regs->gusbcfg);
+		regs->grstctl = DWC_READ_REG32(&global_regs->grstctl);
+	//	regs->gintsts = DWC_READ_REG32(&global_regs->gintsts);
+		regs->gintmsk = DWC_READ_REG32(&global_regs->gintmsk);
+	//	regs->grxstsr = DWC_READ_REG32(&global_regs->grxstsr);
+	//	regs->grxstsp = DWC_READ_REG32(&global_regs->grxstsp);
+		regs->grxfsiz = DWC_READ_REG32(&global_regs->grxfsiz);
+		regs->gnptxfsiz = DWC_READ_REG32(&global_regs->gnptxfsiz);
+	//	regs->gnptxsts = DWC_READ_REG32(&global_regs->gnptxsts);
+		regs->gi2cctl = DWC_READ_REG32(&global_regs->gi2cctl);
+		regs->gpvndctl = DWC_READ_REG32(&global_regs->gpvndctl);
+		regs->ggpio = DWC_READ_REG32(&global_regs->ggpio);
+	//	regs->guid = DWC_READ_REG32(&global_regs->guid);
+	//	regs->gsnpsid = DWC_READ_REG32(&global_regs->gsnpsid);
+		regs->ghwcfg1 = DWC_READ_REG32(&global_regs->ghwcfg1);
+		regs->ghwcfg2 = DWC_READ_REG32(&global_regs->ghwcfg2);
+		regs->ghwcfg3 = DWC_READ_REG32(&global_regs->ghwcfg3);
+		regs->ghwcfg4 = DWC_READ_REG32(&global_regs->ghwcfg4);
+		regs->glpmcfg = DWC_READ_REG32(&global_regs->glpmcfg);
+		regs->gpwrdn = DWC_READ_REG32(&global_regs->gpwrdn);
+		regs->gdfifocfg = DWC_READ_REG32(&global_regs->gdfifocfg);
+		regs->adpctl = DWC_READ_REG32(&global_regs->adpctl);
+	//	regs->reserved39[39] = DWC_READ_REG32(&global_regs->reserved39[39]);
+		regs->hptxfsiz = DWC_READ_REG32(&global_regs->hptxfsiz);
+		for (i = 0; ARRAY_SIZE(regs->dtxfsiz) > i; i++)
+			regs->dtxfsiz[i] = DWC_READ_REG32(&global_regs->dtxfsiz[i]);	// 0~15
+	} else {
+		DWC_WRITE_REG32(&global_regs->gotgctl, regs->gotgctl);
+		DWC_WRITE_REG32(&global_regs->gotgint, regs->gotgint);
+		DWC_WRITE_REG32(&global_regs->gahbcfg, regs->gahbcfg);
+		DWC_WRITE_REG32(&global_regs->gusbcfg, regs->gusbcfg);
+		DWC_WRITE_REG32(&global_regs->grstctl, regs->grstctl);
+	//	DWC_WRITE_REG32(&global_regs->gintsts, regs->gintsts);
+		DWC_WRITE_REG32(&global_regs->gintmsk, regs->gintmsk);
+	//	DWC_WRITE_REG32(&global_regs->grxstsr, regs->grxstsr);
+	//	DWC_WRITE_REG32(&global_regs->grxstsp, regs->grxstsp);
+		DWC_WRITE_REG32(&global_regs->grxfsiz, regs->grxfsiz);
+		DWC_WRITE_REG32(&global_regs->gnptxfsiz, regs->gnptxfsiz);
+	//	DWC_WRITE_REG32(&global_regs->gnptxsts, regs->gnptxsts);
+		DWC_WRITE_REG32(&global_regs->gi2cctl, regs->gi2cctl);
+		DWC_WRITE_REG32(&global_regs->gpvndctl, regs->gpvndctl);
+		DWC_WRITE_REG32(&global_regs->ggpio, regs->ggpio);
+	//	DWC_WRITE_REG32(&global_regs->guid, regs->guid);
+	//	DWC_WRITE_REG32(&global_regs->gsnpsid, regs->gsnpsid);
+		DWC_WRITE_REG32(&global_regs->ghwcfg1, regs->ghwcfg1);
+		DWC_WRITE_REG32(&global_regs->ghwcfg2, regs->ghwcfg2);
+		DWC_WRITE_REG32(&global_regs->ghwcfg3, regs->ghwcfg3);
+		DWC_WRITE_REG32(&global_regs->ghwcfg4, regs->ghwcfg4);
+		DWC_WRITE_REG32(&global_regs->glpmcfg, regs->glpmcfg);
+		DWC_WRITE_REG32(&global_regs->gpwrdn, regs->gpwrdn);
+		DWC_WRITE_REG32(&global_regs->gdfifocfg, regs->gdfifocfg);
+		DWC_WRITE_REG32(&global_regs->adpctl, regs->adpctl);
+	//	DWC_WRITE_REG32(&global_regs->reserved39[39], regs->reserved39[39]);
+		DWC_WRITE_REG32(&global_regs->hptxfsiz, regs->hptxfsiz);
+		for (i = 0; ARRAY_SIZE(regs->dtxfsiz) > i; i++)
+			DWC_WRITE_REG32(&global_regs->dtxfsiz[i], regs->dtxfsiz[i]);	// 0~15
+	}
+}
+
+#if 0
+static int dwc_otg_hcd_suspend(struct usb_hcd *hcd) { return 0; }
+static int dwc_otg_hcd_resume(struct usb_hcd *hcd) { return 0; }
+#else
+static int dwc_otg_hcd_suspend(struct usb_hcd *hcd)
+{
+    dwc_otg_hcd_t *dwc_otg_hcd = hcd_to_dwc_otg_hcd (hcd);
+    dwc_otg_core_if_t *core_if = dwc_otg_hcd->core_if;
+//    hprt0_data_t hprt0;
+//    pcgcctl_data_t pcgcctl;
+
+    if(core_if->op_state == B_PERIPHERAL) {
+    	DWC_PRINTF("%s, usb device mode\n", __func__);
+    	return 0;
+    }
+
+	#ifdef DWC_DEVICE_ONLY
+	return 0;
+	#endif
+
+	dwc_otg_driver_suspend_regs(core_if, 1);
+/*
+    hprt0.d32 = DWC_READ_REG32(core_if->host_if->hprt0);
+	#ifdef CONFIG_USB_SUSPEND
+    if((!hprt0.b.prtena))
+        return 0;
+	#endif
+    DWC_PRINTF("%s suspend, HPRT0:0x%x\n",hcd->self.bus_name,hprt0.d32);
+    if(hprt0.b.prtconnsts) {  // usb device connected
+        //partial power-down
+        if(!hprt0.b.prtsusp) {
+            //hprt0.d32 = 0;
+            hprt0.b.prtsusp = 1;
+            hprt0.b.prtena = 0;
+            DWC_WRITE_REG32(core_if->host_if->hprt0, hprt0.d32);
+        }
+        udelay(10);
+        hprt0.d32 = DWC_READ_REG32(core_if->host_if->hprt0);
+        if(!hprt0.b.prtsusp) {
+            //hprt0.d32 = 0;
+            hprt0.b.prtsusp = 1;
+            hprt0.b.prtena = 0;
+            DWC_WRITE_REG32(core_if->host_if->hprt0, hprt0.d32);
+        }
+        mdelay(5);
+        pcgcctl.d32 = DWC_READ_REG32(core_if->pcgcctl);
+        pcgcctl.b.pwrclmp = 1;//power clamp
+        DWC_WRITE_REG32(core_if->pcgcctl, pcgcctl.d32);
+        udelay(1);
+        //pcgcctl.b.rstpdwnmodule = 1;//reset PDM
+        pcgcctl.b.stoppclk = 1;//stop phy clk
+        DWC_WRITE_REG32(core_if->pcgcctl, pcgcctl.d32);
+    } else { //no device connect
+        if (core_if->hcd_cb && core_if->hcd_cb->suspend)
+			core_if->hcd_cb->suspend(core_if->hcd_cb->p);
+    }
+    udelay(3);
+*/
+    /* Clear any pending interrupts */
+    dwc_otg_disable_global_interrupts(core_if);
+    DWC_WRITE_REG32(&core_if->core_global_regs->gintsts, 0xFFFFFFFF);
+
+    //power off
+    otg_clk_disable();
+	// phy off at dwc_otg_driver.c
+    return 0;
+}
+
+static int dwc_otg_hcd_resume(struct usb_hcd *hcd)
+{
+    dwc_otg_hcd_t *dwc_otg_hcd = hcd_to_dwc_otg_hcd (hcd);
+    dwc_otg_core_if_t *core_if = dwc_otg_hcd->core_if;
+//    hprt0_data_t hprt0;
+//    pcgcctl_data_t pcgcctl;
+//    gintmsk_data_t gintmsk;
+    gotgctl_data_t gotgctl = {.d32 = 0 };
+
+    if(core_if->op_state == B_PERIPHERAL) {
+    	DWC_PRINTF("%s, usb device mode\n", __func__);
+    	return 0;
+    }
+
+#ifdef DWC_DEVICE_ONLY
+	return 0;
+#endif
+
+	dwc_otg_driver_suspend_regs(core_if, 0);
+/*
+    //partial power-down
+    //power on
+    pcgcctl.d32 = DWC_READ_REG32(core_if->pcgcctl);;
+    pcgcctl.b.stoppclk = 0;//stop phy clk
+    DWC_WRITE_REG32(core_if->pcgcctl, pcgcctl.d32);
+    udelay(1);
+    pcgcctl.b.pwrclmp = 0;//power clamp
+    DWC_WRITE_REG32(core_if->pcgcctl, pcgcctl.d32);
+    udelay(2);
+
+    gintmsk.d32 = DWC_READ_REG32(&core_if->core_global_regs->gintmsk);
+    gintmsk.b.portintr = 0;
+    DWC_WRITE_REG32(&core_if->core_global_regs->gintmsk, gintmsk.d32);
+
+    hprt0.d32 = DWC_READ_REG32(core_if->host_if->hprt0);
+#ifdef CONFIG_USB_SUSPEND
+    if(!hprt0.b.prtena)
+        return 0;
+#endif
+    DWC_PRINTF("%s resume, HPRT0:0x%x\n",hcd->self.bus_name,hprt0.d32);
+    if(hprt0.b.prtconnsts)
+    {
+        //hprt0.d32 = DWC_READ_REG32(core_if->host_if->hprt0);
+        //DWC_PRINTF("%s, HPRT0:0x%x\n",hcd->self.bus_name,hprt0.d32);
+        hprt0.b.prtpwr = 1;
+        hprt0.b.prtres = 1;
+        hprt0.b.prtena = 0;
+        DWC_WRITE_REG32(core_if->host_if->hprt0, hprt0.d32);
+        mdelay(20);
+        hprt0.d32 = DWC_READ_REG32(core_if->host_if->hprt0);
+        //DWC_PRINTF("%s, HPRT0:0x%x\n",hcd->self.bus_name,hprt0.d32);
+        //hprt0.d32 = 0;
+        hprt0.b.prtpwr = 1;
+        hprt0.b.prtres = 0;
+        hprt0.b.prtena = 0;
+        DWC_WRITE_REG32(core_if->host_if->hprt0, hprt0.d32);
+        hprt0.d32 = 0;
+        hprt0.b.prtpwr = 1;
+        hprt0.b.prtena = 0;
+        hprt0.b.prtconndet = 1;
+        DWC_WRITE_REG32(core_if->host_if->hprt0, hprt0.d32);
+
+        //hprt0.d32 = DWC_READ_REG32(core_if->host_if->hprt0);
+        //DWC_PRINTF("%s, HPRT0:0x%x\n",hcd->self.bus_name,hprt0.d32);
+        mdelay(10);
+    } else {
+        if (core_if->hcd_cb && core_if->hcd_cb->suspend)
+        	core_if->hcd_cb->suspend(core_if->hcd_cb->p);
+    }
+    gintmsk.b.portintr = 1;
+    DWC_WRITE_REG32(&core_if->core_global_regs->gintmsk, gintmsk.d32);
+*/
+
+	dwc_otg_core_init(core_if);
+	dwc_otg_enable_global_interrupts(core_if);
+
+    gotgctl.d32 = DWC_READ_REG32(&core_if->core_global_regs->gotgctl);
+
+    /* B-Device connector (Device Mode) */
+    if (gotgctl.b.conidsts) {
+		core_if->op_state = B_PERIPHERAL;
+        dwc_otg_set_prtpower(core_if, 0);
+		core_if->host_flag = 0;
+		cil_pcd_start(core_if);
+	} else {
+		core_if->op_state = A_HOST;
+		core_if->host_flag = 1;
+		cil_hcd_start(core_if);
+		// wait until device is stable.
+	    dwc_mdelay(100);
+	}
+
+	return 0;
+}
+#endif
+#endif	/* CONFIG_PM && CONFIG_ARCH_CPU_NEXELL */
 
 static struct hc_driver dwc_otg_hc_driver = {
 
@@ -160,10 +384,9 @@ static struct hc_driver dwc_otg_hc_driver = {
 
 	.hub_status_data = hub_status_data,
 	.hub_control = hub_control,
-// psw0523 add
-#ifdef CONFIG_PM
-	.bus_suspend = dwc_otg_hcd_bus_suspend,                
-	.bus_resume = dwc_otg_hcd_bus_resume,
+#if defined(CONFIG_PM) && defined(CONFIG_ARCH_CPU_NEXELL)
+	.bus_suspend = dwc_otg_hcd_suspend,
+	.bus_resume = dwc_otg_hcd_resume,
 #endif
 };
 
@@ -283,13 +506,15 @@ static void free_bus_bandwidth(struct usb_hcd *hcd, uint32_t bw,
 
 /**
  * Sets the final status of an URB and returns it to the device driver. Any
- * required cleanup of the URB is performed.
+ * required cleanup of the URB is performed.  The HCD lock should be held on
+ * entry.
  */
 static int _complete(dwc_otg_hcd_t * hcd, void *urb_handle,
 		     dwc_otg_hcd_urb_t * dwc_otg_urb, int32_t status)
 {
 	struct urb *urb = (struct urb *)urb_handle;
 	urb_tq_entry_t *new_entry;
+	int rc = 0;
 	if (CHK_DEBUG_LEVEL(DBG_HCDV | DBG_HCD_URB)) {
 		DWC_PRINTF("%s: urb %p, device %d, ep %d %s, status=%d\n",
 			   __func__, urb, usb_pipedevice(urb->pipe),
@@ -324,6 +549,9 @@ static int _complete(dwc_otg_hcd_t * hcd, void *urb_handle,
 		break;
 	case -DWC_E_OVERFLOW:
 		status = -EOVERFLOW;
+		break;
+	case -DWC_E_SHUTDOWN:
+		status = -ESHUTDOWN;
 		break;
 	default:
 		if (status) {
@@ -381,9 +609,17 @@ static int _complete(dwc_otg_hcd_t * hcd, void *urb_handle,
 #endif
 	} else {
 		new_entry->urb = urb;
-		DWC_TAILQ_INSERT_TAIL(&hcd->completed_urb_list, new_entry,
-					urb_tq_entries);
-		DWC_TASK_HI_SCHEDULE(hcd->completion_tasklet);
+#if USB_URB_EP_LINKING
+		rc = usb_hcd_check_unlink_urb(dwc_otg_hcd_to_hcd(hcd), urb, urb->status);
+		if(0 == rc) {
+			usb_hcd_unlink_urb_from_ep(dwc_otg_hcd_to_hcd(hcd), urb);
+		}
+#endif
+		if(0 == rc) {
+			DWC_TAILQ_INSERT_TAIL(&hcd->completed_urb_list, new_entry,
+						urb_tq_entries);
+			DWC_TASK_HI_SCHEDULE(hcd->completion_tasklet);
+		}
 	}
 	return 0;
 }
@@ -397,21 +633,14 @@ static struct dwc_otg_hcd_function_ops hcd_fops = {
 	.get_b_hnp_enable = _get_b_hnp_enable,
 };
 
-// psw0523 fix
-#if 0
-static struct fiq_handler fh = {
-  .name = "usb_fiq",
-};
-static uint8_t fiqStack[1024];
-#endif
-
-// psw0523 add
-#ifdef CONFIG_PM
-struct dwc_otg_hcd_function_ops *get_hcd_fops(void)
-{
-    return &hcd_fops;
-}
-#endif
+//static struct fiq_handler fh = {
+//  .name = "usb_fiq",
+//};
+struct fiq_stack_s {
+	int magic1;
+	uint8_t stack[2048];
+	int magic2;
+} fiq_stack;
 
 extern mphi_regs_t c_mphi_regs;
 /**
@@ -427,8 +656,7 @@ int hcd_init(dwc_bus_dev_t *_dev)
 	dwc_otg_device_t *otg_dev = DWC_OTG_BUSDRVDATA(_dev);
 	int retval = 0;
     u64 dmamask;
-    // psw0523 fix
-	//struct pt_regs regs;
+//	struct pt_regs regs;
 
 	DWC_DEBUGPL(DBG_HCD, "DWC OTG HCD INIT otg_dev=%p\n", otg_dev);
 
@@ -446,18 +674,19 @@ int hcd_init(dwc_bus_dev_t *_dev)
 	pci_set_consistent_dma_mask(_dev, dmamask);
 #endif
 
-// psw0523 fix
-#if 0
+#ifdef CONFIG_FIQ
 	if (fiq_fix_enable)
 	{
 		// Set up fiq
 		claim_fiq(&fh);
-		set_fiq_handler(__FIQ_Branch, 8);
+		set_fiq_handler(__FIQ_Branch, 4);
 		memset(&regs,0,sizeof(regs));
 		regs.ARM_r8 = (long)dwc_otg_hcd_handle_fiq;
 		regs.ARM_r9 = (long)0;
-		regs.ARM_sp = (long)fiqStack + sizeof(fiqStack) - 4;
+		regs.ARM_sp = (long)fiq_stack.stack + sizeof(fiq_stack.stack) - 4;
 		set_fiq_regs(&regs);
+		fiq_stack.magic1 = 0xdeadbeef;
+		fiq_stack.magic2 = 0xaa995566;
 	}
 #endif
 
@@ -480,16 +709,18 @@ int hcd_init(dwc_bus_dev_t *_dev)
 
 	hcd->regs = otg_dev->os_dep.base;
 
-// psw0523 fix
-#if 0
 	if (fiq_fix_enable)
 	{
+		volatile extern void *dwc_regs_base;
+
 		//Set the mphi periph to  the required registers
 		c_mphi_regs.base    = otg_dev->os_dep.mphi_base;
 		c_mphi_regs.ctrl    = otg_dev->os_dep.mphi_base + 0x4c;
 		c_mphi_regs.outdda  = otg_dev->os_dep.mphi_base + 0x28;
 		c_mphi_regs.outddb  = otg_dev->os_dep.mphi_base + 0x2c;
 		c_mphi_regs.intstat = otg_dev->os_dep.mphi_base + 0x50;
+
+		dwc_regs_base = otg_dev->os_dep.base;
 
 		//Enable mphi peripheral
 		writel((1<<31),c_mphi_regs.ctrl);
@@ -499,10 +730,11 @@ int hcd_init(dwc_bus_dev_t *_dev)
 		else
 			DWC_DEBUGPL(DBG_USER, "MPHI periph has NOT been enabled\n");
 #endif
+#ifdef CONFIG_FIQ
 		// Enable FIQ interrupt from USB peripheral
 		enable_fiq(INTERRUPT_VC_USB);
-	}
 #endif
+	}
 	/* Initialize the DWC OTG HCD. */
 	dwc_otg_hcd = dwc_otg_hcd_alloc_hcd();
 	if (!dwc_otg_hcd) {
@@ -695,10 +927,8 @@ static int dwc_otg_urb_enqueue(struct usb_hcd *hcd,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,28)
 	struct usb_host_endpoint *ep = urb->ep;
 #endif
-#if USB_URB_EP_LINKING
-	dwc_irqflags_t irqflags;
-#endif
-	void **ref_ep_hcpriv = &ep->hcpriv;
+      	dwc_irqflags_t irqflags;
+        void **ref_ep_hcpriv = &ep->hcpriv;
 	dwc_otg_hcd_t *dwc_otg_hcd = hcd_to_dwc_otg_hcd(hcd);
 	dwc_otg_hcd_urb_t *dwc_otg_urb;
 	int i;
@@ -738,10 +968,10 @@ static int dwc_otg_urb_enqueue(struct usb_hcd *hcd,
 		ep_type = USB_ENDPOINT_XFER_INT;
 		break;
 	default:
-		DWC_WARN("Wrong EP type - %d\n", usb_pipetype(urb->pipe));
+                DWC_WARN("Wrong EP type - %d\n", usb_pipetype(urb->pipe));
 	}
 
-	/* # of packets is often 0 - do we really need to call this then? */
+        /* # of packets is often 0 - do we really need to call this then? */
 	dwc_otg_urb = dwc_otg_hcd_urb_alloc(dwc_otg_hcd,
 					    urb->number_of_packets,
 					    mem_flags == GFP_ATOMIC ? 1 : 0);
@@ -749,10 +979,9 @@ static int dwc_otg_urb_enqueue(struct usb_hcd *hcd,
 	if(dwc_otg_urb == NULL)
 		return -ENOMEM;
 
-	urb->hcpriv = dwc_otg_urb;
 	if (!dwc_otg_urb && urb->number_of_packets)
 		return -ENOMEM;
-        
+
 	dwc_otg_hcd_urb_set_pipeinfo(dwc_otg_urb, usb_pipedevice(urb->pipe),
 				     usb_pipeendpoint(urb->pipe), ep_type,
 				     usb_pipein(urb->pipe),
@@ -768,8 +997,8 @@ static int dwc_otg_urb_enqueue(struct usb_hcd *hcd,
 		 * when handling non DWORD aligned buffers.
 		 */
 		//buf = phys_to_virt(urb->transfer_dma);
-		// DMA addresses are bus addresses not physical addresses!
-		buf = dma_to_virt(&urb->dev->dev, urb->transfer_dma);
+                // DMA addresses are bus addresses not physical addresses!
+                buf = dma_to_virt(&urb->dev->dev, urb->transfer_dma);
 	}
 
 	if (!(urb->transfer_flags & URB_NO_INTERRUPT))
@@ -789,17 +1018,16 @@ static int dwc_otg_urb_enqueue(struct usb_hcd *hcd,
 						    urb->iso_frame_desc[i].length);
 	}
 
-#if USB_URB_EP_LINKING
 	DWC_SPINLOCK_IRQSAVE(dwc_otg_hcd->lock, &irqflags);
+	urb->hcpriv = dwc_otg_urb;
+#if USB_URB_EP_LINKING
 	retval = usb_hcd_link_urb_to_ep(hcd, urb);
-	DWC_SPINUNLOCK_IRQRESTORE(dwc_otg_hcd->lock, irqflags);
-	if (0 == retval) 
+	if (0 == retval)
 #endif
 	{
 		retval = dwc_otg_hcd_urb_enqueue(dwc_otg_hcd, dwc_otg_urb,
-				/*(dwc_otg_qh_t **)*/
-				ref_ep_hcpriv, 
-				mem_flags == GFP_ATOMIC ? 1 : 0);
+						/*(dwc_otg_qh_t **)*/
+						ref_ep_hcpriv, 1);
 		if (0 == retval) {
 			if (alloc_bandwidth) {
 				allocate_bus_bandwidth(hcd,
@@ -808,18 +1036,24 @@ static int dwc_otg_urb_enqueue(struct usb_hcd *hcd,
 						urb);
 			}
 		} else {
-#if USB_URB_EP_LINKING
-			dwc_irqflags_t irqflags;
 			DWC_DEBUGPL(DBG_HCD, "DWC OTG dwc_otg_hcd_urb_enqueue failed rc %d\n", retval);
-			DWC_SPINLOCK_IRQSAVE(dwc_otg_hcd->lock, &irqflags);
+#if USB_URB_EP_LINKING
 			usb_hcd_unlink_urb_from_ep(hcd, urb);
-			DWC_SPINUNLOCK_IRQRESTORE(dwc_otg_hcd->lock, irqflags);
 #endif
-			if (retval == -DWC_E_NO_DEVICE) {
+			DWC_FREE(dwc_otg_urb);
+			urb->hcpriv = NULL;
+			if (retval == -DWC_E_NO_DEVICE)
 				retval = -ENODEV;
-			}
 		}
 	}
+#if USB_URB_EP_LINKING
+	else
+	{
+		DWC_FREE(dwc_otg_urb);
+		urb->hcpriv = NULL;
+	}
+#endif
+	DWC_SPINUNLOCK_IRQRESTORE(dwc_otg_hcd->lock, irqflags);
 	return retval;
 }
 
@@ -833,7 +1067,7 @@ static int dwc_otg_urb_dequeue(struct usb_hcd *hcd, struct urb *urb, int status)
 {
 	dwc_irqflags_t flags;
 	dwc_otg_hcd_t *dwc_otg_hcd;
-        int rc;
+	int rc;
 
 	DWC_DEBUGPL(DBG_HCD, "DWC OTG HCD URB Dequeue\n");
 
@@ -849,36 +1083,36 @@ static int dwc_otg_urb_dequeue(struct usb_hcd *hcd, struct urb *urb, int status)
 	rc = usb_hcd_check_unlink_urb(hcd, urb, status);
 	if (0 == rc) {
 		if(urb->hcpriv != NULL) {
-	                dwc_otg_hcd_urb_dequeue(dwc_otg_hcd,
-    	                                    (dwc_otg_hcd_urb_t *)urb->hcpriv);
+			dwc_otg_hcd_urb_dequeue(dwc_otg_hcd,
+					(dwc_otg_hcd_urb_t *)urb->hcpriv);
 
-        	        DWC_FREE(urb->hcpriv);
-            		urb->hcpriv = NULL;
-            	}
-        }
+			DWC_FREE(urb->hcpriv);
+			urb->hcpriv = NULL;
+		}
+	}
 
-        if (0 == rc) {
-        	/* Higher layer software sets URB status. */
+	if (0 == rc) {
+		/* Higher layer software sets URB status. */
 #if USB_URB_EP_LINKING
-                usb_hcd_unlink_urb_from_ep(hcd, urb);
+		usb_hcd_unlink_urb_from_ep(hcd, urb);
 #endif
-        	DWC_SPINUNLOCK_IRQRESTORE(dwc_otg_hcd->lock, flags);
+		DWC_SPINUNLOCK_IRQRESTORE(dwc_otg_hcd->lock, flags);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,28)
-                usb_hcd_giveback_urb(hcd, urb);
+		usb_hcd_giveback_urb(hcd, urb);
 #else
-                usb_hcd_giveback_urb(hcd, urb, status);
+		usb_hcd_giveback_urb(hcd, urb, status);
 #endif
-                if (CHK_DEBUG_LEVEL(DBG_HCDV | DBG_HCD_URB)) {
-                        DWC_PRINTF("Called usb_hcd_giveback_urb() \n");
-                        DWC_PRINTF("  1urb->status = %d\n", urb->status);
-                }
-                DWC_DEBUGPL(DBG_HCD, "DWC OTG HCD URB Dequeue OK\n");
-        } else {
-        	DWC_SPINUNLOCK_IRQRESTORE(dwc_otg_hcd->lock, flags);
-                DWC_DEBUGPL(DBG_HCD, "DWC OTG HCD URB Dequeue failed - rc %d\n",
-                            rc);
-        }
-           
+		if (CHK_DEBUG_LEVEL(DBG_HCDV | DBG_HCD_URB)) {
+			DWC_PRINTF("Called usb_hcd_giveback_urb() \n");
+			DWC_PRINTF("  1urb->status = %d\n", urb->status);
+		}
+		DWC_DEBUGPL(DBG_HCD, "DWC OTG HCD URB Dequeue OK\n");
+	} else {
+		DWC_SPINUNLOCK_IRQRESTORE(dwc_otg_hcd->lock, flags);
+		DWC_DEBUGPL(DBG_HCD, "DWC OTG HCD URB Dequeue failed - rc %d\n",
+				rc);
+	}
+
 	return rc;
 }
 

@@ -747,6 +747,12 @@ config VIDEO_HI253
     ---help---
       This driver supports Hynix HI253 SoC camera module for V4L2 Media API.
 
+config VIDEO_HI25X
+    tristate "Hynix HI253 HI256 2M pixel camera sensor support"
+    depends on I2C && VIDEO_V4L2
+    ---help---
+      This driver supports Hynix HI253 & HI256 SoC camera module for V4L2 Media API.	  
+	  
 comment "Flash devices"
 
 config VIDEO_ADP1653
@@ -1254,6 +1260,8 @@ config SOC_CAMERA_HI253
 	help
 	  This is a V4L2 SoC camera driver for Hynix HI253 2MP sensors
 
+comment "Flash devices"
+	  
 config MX1_VIDEO
 	bool
 

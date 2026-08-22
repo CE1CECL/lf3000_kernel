@@ -125,7 +125,7 @@ config ADC_NEXELL
 
 config SOC_LFP100
 	tristate "Support for the LFP100/LFP200/LFP300/LFP400 audio/power/backlight chip"
-	depends on (PLAT_NXP4330_R3K || PLAT_NXP4330_CABO || PLAT_NXP4330_GLASGOW_ALPHA || PLAT_NXP4330_XANADU)
+	depends on (PLAT_NXP4330_R3K || PLAT_NXP4330_CABO || PLAT_NXP4330_GLASGOW_ALPHA || PLAT_NXP4330_XANADU || PLAT_NXP4330_LOWCOST)
 	default y
 	---help---
 	This option enables platform support for the LFP100 combination
@@ -161,6 +161,11 @@ config  POWER_DOWN_STANDBY
         bool "Standby"
 	---help---
 	Place system in STANDBY mode
+
+config  POWER_DOWN_SRC_DEP
+        bool "Off"
+	---help---
+	Place system in either OFF or STANDBY mode, based on the power source
 
 endchoice
 

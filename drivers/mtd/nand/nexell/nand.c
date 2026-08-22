@@ -2843,6 +2843,7 @@ static int init_lf2000_onboard_nand(struct nand_chip *chip)
 		case LF3000_BOARD_GLASGOW_BETA:
 		case LF3000_BOARD_XANADU:
 		case LF3000_BOARD_XANADU_TI:
+		case LF3000_BOARD_LOWCOST:
 			chip->select_chip = onboard_nand_select;
 			break;
 		default: 
@@ -2907,6 +2908,7 @@ static int init_lf2000_cart_nand(struct nand_chip *chip)
 		case LF3000_BOARD_GLASGOW_BETA:
 		case LF3000_BOARD_XANADU:
 		case LF3000_BOARD_XANADU_TI:
+		case LF3000_BOARD_LOWCOST:
 			chip->select_chip = cart_nand_select;
 			break;
 		default:

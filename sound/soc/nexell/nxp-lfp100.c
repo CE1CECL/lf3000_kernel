@@ -123,6 +123,7 @@ static int lfp100_init(struct snd_soc_pcm_runtime *rtd)
 				
 			case CABO:
 			case XANADU:
+			case LOWCOST:
 				for (i = 0; i < ARRAY_SIZE(lfp100_cabo_settings); i++) {
 					codec->driver->write(codec,
 						lfp100_cabo_settings[i][0],

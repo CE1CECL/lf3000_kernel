@@ -110,6 +110,7 @@ struct lf2000_hwmon {
 	unsigned int low_battery_mv;		/* low battery level */
 	unsigned int low_battery_repeat_mv;	/* low battery repeat delta */
 	unsigned int critical_battery_mv;	/* critical battery level */
+	unsigned int battery_down_mv;
 
 	unsigned int adc_slope_256;		/* mx part of line	*/
 	unsigned int adc_constant;		/* constant part of line */
@@ -170,7 +171,7 @@ static struct lf2000_hwmon *hwmon_dev = NULL;
 unsigned int detect_usb_charger(void);
 
 /* Return raw ADC reading */
-int adc_GetReading(int channel)
+static int adc_GetReading(int channel)
 {
 //	return soc_adc_read(channel, 1000);
 
@@ -225,6 +226,7 @@ static int lf2000_get_battery_mv(struct lf2000_hwmon *hwmon_dev)
 }
 EXPORT_SYMBOL_GPL(lf2000_get_battery_mv);
 
+#ifdef CONFIG_BQ24250_CHARGER
 static unsigned int get_usb_charger_type(unsigned int on_battery)
 {
         if (on_battery)
@@ -251,6 +253,7 @@ static unsigned int get_usb_charger_type(unsigned int on_battery)
 		
         }
 }
+#endif //CONFIG_BQ24250_CHARGER
 
 /*
  * Battery pack thermister value below 1000 mv (1 volts) means not in
@@ -353,6 +356,8 @@ static enum lf1000_power_status power_to_status(
 	if(mv < 0)
 		return LF1000_UNKNOWN;
 
+	if(mv < hwmon_dev->battery_down_mv)
+		return BATTERY_DOWN;
 	if(mv < hwmon_dev->critical_battery_mv)
 		return CRITICAL_BATTERY;
 	
@@ -671,9 +676,6 @@ static ssize_t show_usb_charger_type(struct device *pdev,
         return scnprintf(buf, PAGE_SIZE, "%s\n", usb_type[type]);
 }
 
-static DEVICE_ATTR(usb_charger_type, S_IRUSR|S_IRGRP|S_IROTH,
-                show_usb_charger_type, NULL);
-
 static ssize_t show_charge_status(struct device *pdev,
                                 struct device_attribute *attr, char *buf)
 {       
@@ -682,9 +684,6 @@ static ssize_t show_charge_status(struct device *pdev,
         
         return scnprintf(buf, PAGE_SIZE, "%s\n", charge_status[status]);
 }       
-
-static DEVICE_ATTR(charge_status, S_IRUSR|S_IRGRP|S_IROTH,
-                show_charge_status, NULL);
 
 static ssize_t show_charge_current(struct device *pdev,
                                 struct device_attribute *attr, char *buf)
@@ -708,9 +707,6 @@ static ssize_t show_charge_current(struct device *pdev,
 	}
 
 }
-
-static DEVICE_ATTR(charge_current, S_IRUSR|S_IRGRP|S_IROTH,
-                show_charge_current, NULL);
 
 static ssize_t show_charge_enable(struct device *dev, struct device_attribute *attr,
                         char *buf)
@@ -750,10 +746,52 @@ the charger chip. Commenting it out for now and may have to fix this if this is 
         return count;
 }
 
+#else //CONFIG_BQ24250_CHARGER
+
+static ssize_t show_usb_charger_type(struct device *pdev,
+                                struct device_attribute *attr, char *buf)
+{
+        return scnprintf(buf, PAGE_SIZE, "%s\n", usb_type[BQ24250_NONE_DETECTED]);
+}
+
+static ssize_t show_charge_status(struct device *pdev,
+                                struct device_attribute *attr, char *buf)
+{
+        return scnprintf(buf, PAGE_SIZE, "%s\n", charge_status[BQ24250_CHARGING_FAULT]);
+}
+
+static ssize_t show_charge_current(struct device *pdev,
+                                struct device_attribute *attr, char *buf)
+{
+		return scnprintf(buf, PAGE_SIZE, "0\n");
+}
+
+static ssize_t show_charge_enable(struct device *dev, struct device_attribute *attr,
+                        char *buf)
+{
+		return sprintf(buf, "Disabled\n");
+}
+
+static ssize_t set_charge_enable(struct device *dev, struct device_attribute *attr,
+                        const char *buf, size_t count)
+{
+        return count;
+}
+
+#endif
+
+static DEVICE_ATTR(usb_charger_type, S_IRUSR|S_IRGRP|S_IROTH,
+                show_usb_charger_type, NULL);
+
+static DEVICE_ATTR(charge_status, S_IRUSR|S_IRGRP|S_IROTH,
+                show_charge_status, NULL);
+
+static DEVICE_ATTR(charge_current, S_IRUSR|S_IRGRP|S_IROTH,
+                show_charge_current, NULL);
+
 static DEVICE_ATTR(charge_enable, S_IRUSR|S_IRGRP|S_IROTH|S_IWUSR|S_IWGRP|S_IWOTH,
         show_charge_enable, set_charge_enable);
 
-#endif
 static struct attribute *power_attributes[] = {
 	&dev_attr_shutdown.attr,
 	&dev_attr_voltage.attr,
@@ -768,12 +806,10 @@ static struct attribute *power_attributes[] = {
 	&dev_attr_adc_slope_256.attr,
 	&dev_attr_adc_constant.attr,
 	&dev_attr_power_source.attr,
-#ifdef CONFIG_BQ24250_CHARGER
 	&dev_attr_usb_charger_type.attr,
 	&dev_attr_charge_status.attr,
 	&dev_attr_charge_current.attr,
 	&dev_attr_charge_enable.attr,
-#endif
 	NULL
 };
 
@@ -1032,7 +1068,7 @@ static int lf2000_is_battery(int chip)
 #ifdef CONFIG_SOC_LFP100
 	case LFP100:
 		//ret = lfp100_is_battery();
-		ret = lfp100_is_usb_present() ? 0 : 1;
+		ret = !lfp100_is_ac() && (lfp100_is_usb_present() ? 0 : 1);
 		break;
 #endif
 
@@ -1072,6 +1108,20 @@ static void lf2000_set_battery(struct work_struct *work)
 
 	switch(hwmon_dev->status)
 	{
+	case BATTERY_DOWN:
+		//printk("In battery down\n");
+        //It is possible that the battery drop suddenly after bootup, should send CRITICAL_BATTERY
+        if (last_status == CRITICAL_BATTERY) {
+            if (pm_power_off)
+            {
+                dev_info(&hwmon_dev->pdev->dev, "Report Battery (%d mv) Will Soon Shutdown\n",
+                        hwmon_dev->supply_mv);
+                pm_power_off();
+            }
+            break;
+        }
+        hwmon_dev->status = CRITICAL_BATTERY;
+        //continue for reporting CRITICAL_BATTERY.
 	case CRITICAL_BATTERY:
 	    /* first report of critical battery */
 	    if(last_status != CRITICAL_BATTERY) {
@@ -1422,6 +1472,7 @@ unsigned int detect_usb_charger(void)
 		case LF2000_BOARD_VALENCIA_KND_1024_600:
 		case LF2000_BOARD_VALENCIA_KND_1024_600_8:
 		case LF2000_BOARD_VALENCIA_CIP:
+		case LF3000_BOARD_LOWCOST:
 		case LF2000_BOARD_VTK:
 			printk(KERN_ERR "%s: Charging not supported 0x%X \n",
 				__func__, system_rev);
@@ -1517,6 +1568,8 @@ static unsigned int set_adc_slope_value(void)
 		case LF3000_BOARD_XANADU:
 		case LF3000_BOARD_XANADU_TI:
 			slope =  263; // (4200 / 4095) * 256
+		case LF3000_BOARD_LOWCOST:
+			slope =  412; // (6600 / 4095) * 256
 			break;
  		default:
 			printk(KERN_ERR "%s: Invalid Board Revision 0x%X \n",
@@ -1585,8 +1638,8 @@ static int lf2000_power_probe(struct platform_device *pdev)
 	priv->normal_battery_mv   = NORMAL_BATTERY_MV;
 	priv->low_battery_mv      = LOW_BATTERY_MV;
 	priv->low_battery_repeat_mv = LOW_BATTERY_REPEAT_MV;
-	priv->low_battery_mv      = LOW_BATTERY_MV;
 	priv->critical_battery_mv = CRITICAL_BATTERY_MV;
+	priv->battery_down_mv     = BATTERY_DOWN_MV;
 
 #ifdef CONFIG_ARCH_LF1000
 	if (gpio_have_gpio_dev()) {

@@ -50,12 +50,17 @@ choice
 		bool "LeapFrog XANADU board"
 		help
 			Platform Support for LeapFrog Xanadu Boards.
+
+	config PLAT_NXP4330_LOWCOST
+		bool "LeapFrog LOWCOST board"
+		help
+			Platform Support for LeapFrog Lowcost Boards.
 					
 endchoice
 
 config NXP4330_LEAPFROG
 	bool "Any LeapFrog board with LF3000"
-	depends on PLAT_NXP4330_CABO || PLAT_NXP4330_GLASGOW_ALPHA || PLAT_NXP4330_R3K || PLAT_NXP4330_XANADU
+	depends on PLAT_NXP4330_CABO || PLAT_NXP4330_GLASGOW_ALPHA || PLAT_NXP4330_R3K || PLAT_NXP4330_XANADU || PLAT_NXP4330_LOWCOST
 	default y
 	---help---
 	This option ought to be selected for all LeapFrog boards (and

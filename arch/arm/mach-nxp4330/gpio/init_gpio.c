@@ -129,6 +129,9 @@ static void bd_gpio_init(void)
 		p_io_pad = &io_pad_xanadu_alpha;
 		break;
 
+	case LF3000_BOARD_LOWCOST:
+		p_io_pad = &io_pad_lowcost_alpha;
+
 	/*
 	case LF3000_BOARD_LIMA:
 		p_io_pad = &io_pad_lima;
@@ -146,6 +149,8 @@ static void bd_gpio_init(void)
 		p_io_pad = &io_pad_glasgow_alpha;
 #elif defined(CONFIG_PLAT_NXP4330_XANADU)
 		p_io_pad = &io_pad_xanadu_alpha;
+#elif defined(CONFIG_PLAT_NXP4330_LOWCOST)
+		p_io_pad = &io_pad_lowcost_alpha;
 #endif
 		break;
 	}
@@ -230,6 +235,10 @@ static void bd_alive_init(void)
 		p_alv_pad = &alv_pad_xanadu_alpha;
 		break;
 
+	case LF3000_BOARD_LOWCOST:
+		p_alv_pad = &alv_pad_lowcost_alpha;
+		break;
+
 	/*
 	case LF3000_BOARD_LIMA:
 		p_alv_pad = &alv_pad_lima;
@@ -247,6 +256,8 @@ static void bd_alive_init(void)
         p_alv_pad = &alv_pad_glasgow_alpha;
 #elif  defined(CONFIG_PLAT_NXP4330_XANADU)
         p_alv_pad = &alv_pad_xanadu_alpha;
+#elif  defined(CONFIG_PLAT_NXP4330_LOWCOST)
+        p_alv_pad = &alv_pad_lowcost_alpha;
 #endif
 		break;
 	}

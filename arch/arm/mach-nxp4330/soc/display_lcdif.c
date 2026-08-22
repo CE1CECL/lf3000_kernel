@@ -36,13 +36,13 @@
 
 #define	REG_BASE()			NX_LCDINTERFACE_GetBaseAddress(0)
 
-#if defined(CONFIG_PLAT_NXP4330_CABO) || defined(CONFIG_PLAT_NXP4330_XANADU)
+#if defined(CONFIG_PLAT_NXP4330_CABO) || defined(CONFIG_PLAT_NXP4330_XANADU) || defined(CONFIG_PLAT_NXP4330_LOWCOST)
 #include "spi_lcd.c"
 #endif
 
 void lcdif_flip(int module, int flip)
 {
-#if defined(CONFIG_PLAT_NXP4330_CABO) || defined(CONFIG_PLAT_NXP4330_XANADU)
+#if defined(CONFIG_PLAT_NXP4330_CABO) || defined(CONFIG_PLAT_NXP4330_XANADU) || defined(CONFIG_PLAT_NXP4330_LOWCOST)
 	spi_lcd_flip(module, flip);
 #endif
 }

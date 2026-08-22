@@ -13,6 +13,7 @@
 
 /* Sensor IDs (WINDOW_PAGE:DEVID) */
 #define HI253_ID	0x92
+#define HI256_ID	0xc0
 #define SR300PC10_ID	0x93
 #define HI161_ID	0x94
 

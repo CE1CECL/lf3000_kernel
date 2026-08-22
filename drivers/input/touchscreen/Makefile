@@ -75,6 +75,7 @@ obj-$(CONFIG_TOUCHSCREEN_FT5X0X)	+= ft5x0x_ts.o
 obj-$(CONFIG_TOUCHSCREEN_GT9xx)     += gt9xx.o gt9xx_update.o goodix_tool.o
 #obj-$(CONFIG_TOUCHSCREEN_GT9xx)     += gt9xx.o
 obj-$(CONFIG_SOC_LFP100)	+= lfp100.o
+obj-$(CONFIG_TOUCHSCREEN_LF2000)	+= lf2000_ts.o
 obj-$(CONFIG_TOUCHSCREEN_ICN83xx_IIC) += ICN83XX/
 obj-$(CONFIG_TOUCHSCREEN_ICN85xx_IIC) += ICN85XX/
 obj-$(CONFIG_TOUCHSCREEN_PAP11XX)	+= PAP11XX/

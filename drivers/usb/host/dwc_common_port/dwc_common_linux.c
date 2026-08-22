@@ -341,27 +341,26 @@ void DWC_DMA_POOL_FREE(dwc_pool_t *pool, void *vaddr, void *daddr)
 
 void *__DWC_DMA_ALLOC(void *dma_ctx, uint32_t size, dwc_dma_t *dma_addr)
 {
-#ifdef xxCOSIM /* Only works for 32-bit cosim */
+#if defined(xxCOSIM) || defined(CONFIG_ARCH_CPU_NEXELL) /* Only works for 32-bit cosim */
 	void *buf = dma_alloc_coherent(dma_ctx, (size_t)size, dma_addr, GFP_KERNEL);
 #else
-    // psw0523 fix for warning
-	//void *buf = dma_alloc_coherent(dma_ctx, (size_t)size, dma_addr, GFP_KERNEL | GFP_DMA32);
-	void *buf = dma_zalloc_coherent(dma_ctx, (size_t)size, dma_addr, GFP_KERNEL | GFP_DMA | __GFP_NOWARN);
+	void *buf = dma_alloc_coherent(dma_ctx, (size_t)size, dma_addr, GFP_KERNEL | GFP_DMA32);
 #endif
 	if (!buf) {
 		return NULL;
 	}
+
+	memset(buf, 0, (size_t)size);
 	return buf;
 }
 
 void *__DWC_DMA_ALLOC_ATOMIC(void *dma_ctx, uint32_t size, dwc_dma_t *dma_addr)
 {
-    // psw0523 fix for warning
-	//void *buf = dma_alloc_coherent(NULL, (size_t)size, dma_addr, GFP_ATOMIC);
-	void *buf = dma_zalloc_coherent(NULL, (size_t)size, dma_addr, GFP_ATOMIC | __GFP_NOWARN | GFP_DMA);
+	void *buf = dma_alloc_coherent(NULL, (size_t)size, dma_addr, GFP_ATOMIC);
 	if (!buf) {
 		return NULL;
 	}
+	memset(buf, 0, (size_t)size);
 	return buf;
 }
 
@@ -585,7 +584,13 @@ void DWC_WRITE_REG64(uint64_t volatile *reg, uint64_t value)
 
 void DWC_MODIFY_REG32(uint32_t volatile *reg, uint32_t clear_mask, uint32_t set_mask)
 {
+	unsigned long flags;
+
+	local_irq_save(flags);
+	local_fiq_disable();
 	writel((readl(reg) & ~clear_mask) | set_mask, reg);
+	local_fiq_enable();
+	local_irq_restore(flags);
 }
 
 #if 0
@@ -617,6 +622,7 @@ void DWC_SPINLOCK_FREE(dwc_spinlock_t *lock)
 {
 #if defined(CONFIG_PREEMPT) || defined(CONFIG_SMP)
 	DWC_FREE(lock);
+	lock = NULL;
 #endif
 }
 
@@ -676,6 +682,7 @@ void DWC_MUTEX_FREE(dwc_mutex_t *mutex)
 {
 	mutex_destroy((struct mutex *)mutex);
 	DWC_FREE(mutex);
+	mutex = NULL;
 }
 #endif
 
@@ -804,8 +811,11 @@ void DWC_TIMER_FREE(dwc_timer_t *timer)
 	DWC_SPINUNLOCK_IRQRESTORE(timer->lock, flags);
 	DWC_SPINLOCK_FREE(timer->lock);
 	DWC_FREE(timer->t);
+	timer->t = NULL;
 	DWC_FREE(timer->name);
+	timer->name = NULL;
 	DWC_FREE(timer);
+	timer = NULL;
 }
 
 void DWC_TIMER_SCHEDULE(dwc_timer_t *timer, uint32_t time)
@@ -857,6 +867,7 @@ dwc_waitq_t *DWC_WAITQ_ALLOC(void)
 void DWC_WAITQ_FREE(dwc_waitq_t *wq)
 {
 	DWC_FREE(wq);
+	wq = NULL;
 }
 
 int32_t DWC_WAITQ_WAIT(dwc_waitq_t *wq, dwc_waitq_condition_t cond, void *data)
@@ -989,6 +1000,7 @@ dwc_tasklet_t *DWC_TASK_ALLOC(char *name, dwc_tasklet_callback_t cb, void *data)
 void DWC_TASK_FREE(dwc_tasklet_t *task)
 {
 	DWC_FREE(task);
+	task = NULL;
 }
 
 void DWC_TASK_SCHEDULE(dwc_tasklet_t *task)
@@ -1000,6 +1012,7 @@ void DWC_TASK_HI_SCHEDULE(dwc_tasklet_t *task)
 {
 	tasklet_hi_schedule(&task->t);
 }
+
 
 /* workqueues
  - run in process context (can sleep)
@@ -1046,8 +1059,10 @@ static void do_work(struct work_struct *work)
 	DWC_DEBUGC("Work done: %s, container=%p", container->name, container);
 	if (container->name) {
 		DWC_FREE(container->name);
+		container->name = NULL;
 	}
 	DWC_FREE(container);
+	container = NULL;
 
 	DWC_SPINLOCK_IRQSAVE(wq->lock, &flags);
 	wq->pending--;
@@ -1121,6 +1136,7 @@ void DWC_WORKQ_FREE(dwc_workq_t *wq)
 	DWC_SPINLOCK_FREE(wq->lock);
 	DWC_WAITQ_FREE(wq->waitq);
 	DWC_FREE(wq);
+	wq = NULL;
 }
 
 void DWC_WORKQ_SCHEDULE(dwc_workq_t *wq, dwc_work_callback_t cb, void *data,
@@ -1150,6 +1166,7 @@ void DWC_WORKQ_SCHEDULE(dwc_workq_t *wq, dwc_work_callback_t cb, void *data,
 	if (!container->name) {
 		DWC_ERROR("Cannot allocate memory for container->name\n");
 		DWC_FREE(container);
+		container = NULL;
 		return;
 	}
 
@@ -1192,6 +1209,7 @@ void DWC_WORKQ_SCHEDULE_DELAYED(dwc_workq_t *wq, dwc_work_callback_t cb,
 	if (!container->name) {
 		DWC_ERROR("Cannot allocate memory for container->name\n");
 		DWC_FREE(container);
+		container = NULL;
 		return;
 	}
 
@@ -1372,7 +1390,6 @@ EXPORT_SYMBOL(DWC_THREAD_SHOULD_STOP);
 EXPORT_SYMBOL(DWC_TASK_ALLOC);
 EXPORT_SYMBOL(DWC_TASK_FREE);
 EXPORT_SYMBOL(DWC_TASK_SCHEDULE);
-EXPORT_SYMBOL(DWC_TASK_HI_SCHEDULE);
 EXPORT_SYMBOL(DWC_WORKQ_WAIT_WORK_DONE);
 EXPORT_SYMBOL(DWC_WORKQ_ALLOC);
 EXPORT_SYMBOL(DWC_WORKQ_FREE);

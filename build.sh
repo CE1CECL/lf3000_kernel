@@ -35,7 +35,7 @@ fi
 
 # check for TARGET_MACH, use default if none provided
 if [ "x$TARGET_MACH" == "x" ]; then
-	export TARGET_MACH=nxp4330_cabo_defconfig
+	export TARGET_MACH=nxp4330_lowcost_defconfig
 fi
 echo "*** Using TARGET_MACH=$TARGET_MACH ***"
 

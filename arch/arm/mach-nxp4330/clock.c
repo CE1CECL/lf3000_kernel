@@ -773,6 +773,7 @@ void __init nxp_cpu_clock_init(void)
 
 	switch (system_rev) {
 	case LF3000_BOARD_CABO:
+	case LF3000_BOARD_LOWCOST:
 		// change GPU clock to PLL1 to fixup old Cabo GM bootloaders
 		#define CLKSRC	0
 		#define DVO0	3

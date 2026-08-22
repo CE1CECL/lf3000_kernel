@@ -31,6 +31,10 @@ ifeq ($(CONFIG_PLAT_NXP4330_SMARTBOX),y)
 PLATBOARD :=smartbox
 endif
 
+ifeq ($(CONFIG_PLAT_NXP4330_LOWCOST),y)
+PLATBOARD := r3k
+endif
+
 #===============================================================================
 # Build options
 #===============================================================================

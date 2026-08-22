@@ -154,6 +154,7 @@ int init_lfp100(void);
 int  lfp100_get_power_button(void);
 int  lfp100_have_lfp100(void);
 int  lfp100_is_battery(void);
+int  lfp100_is_ac(void);
 int  lfp100_is_usb_present(void);
 int  lfp100_is_charging_active(void);
 int  lfp100_read_reg(unsigned int reg);

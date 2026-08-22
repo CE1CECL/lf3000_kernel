@@ -9,7 +9,7 @@ ifneq ($(KERNELRELEASE),)
 ifeq ($(BUS_INTERFACE),)
 #	BUS_INTERFACE = -DPCI_INTERFACE
 #	BUS_INTERFACE = -DLM_INTERFACE
-        BUS_INTERFACE = -DPLATFORM_INTERFACE
+	BUS_INTERFACE = -DPLATFORM_INTERFACE
 endif
 
 #ccflags-y	+= -DDEBUG
@@ -17,17 +17,18 @@ endif
 
 # Use one of the following flags to compile the software in host-only or
 # device-only mode.
-#ccflags-y        += -DDWC_HOST_ONLY
-#ccflags-y        += -DDWC_DEVICE_ONLY
+#ccflags-y	+= -DDWC_HOST_ONLY
+#ccflags-y	+= -DDWC_DEVICE_ONLY
 
 ccflags-y	+= -Dlinux -DDWC_HS_ELECT_TST
 #ccflags-y	+= -DDWC_EN_ISOC
-ccflags-y   	+= -I$(obj)/../dwc_common_port
-#ccflags-y   	+= -I$(PORTLIB)
-ccflags-y   	+= -DDWC_LINUX
-ccflags-y   	+= $(CFI)
+ccflags-y	+= -I$(obj)/../dwc_common_port
+#ccflags-y	+= -I$(PORTLIB)
+ccflags-y	+= -DDWC_LINUX
+ccflags-y	+= $(CFI)
 ccflags-y	+= $(BUS_INTERFACE)
 #ccflags-y	+= -DDWC_DEV_SRPCAP
+#ccflags-y	+= -DPARTIAL_POWER_DOWN
 
 obj-$(CONFIG_USB_DWCOTG) += dwc_otg.o
 

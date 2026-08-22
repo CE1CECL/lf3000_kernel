@@ -109,7 +109,9 @@ enum gpio_resource {
 	BT_LINK             = 93,
 	CHG_INT				= 94,
 	TC7734_INT			= 95,
-	GPIO_NUMBER_VALUES		= 96,
+	TOUCHSCREEN_CTL		= 96,
+
+	GPIO_NUMBER_VALUES, //MAXIMUM
 };
 
 //Physical Specifier Helpers

@@ -41,6 +41,7 @@
 
 #include "dwc_otg_hcd.h"
 #include "dwc_otg_regs.h"
+#include "dwc_otg_mphi_fix.h"
 
 extern bool microframe_schedule;
 
@@ -55,13 +56,15 @@ extern bool microframe_schedule;
 void dwc_otg_hcd_qh_free(dwc_otg_hcd_t * hcd, dwc_otg_qh_t * qh)
 {
 	dwc_otg_qtd_t *qtd, *qtd_tmp;
+	dwc_irqflags_t flags;
 
 	/* Free each QTD in the QTD list */
-	DWC_SPINLOCK(hcd->lock);
+	DWC_SPINLOCK_IRQSAVE(hcd->lock, &flags);
 	DWC_CIRCLEQ_FOREACH_SAFE(qtd, qtd_tmp, &qh->qtd_list, qtd_list_entry) {
 		DWC_CIRCLEQ_REMOVE(&qh->qtd_list, qtd, qtd_list_entry);
 		dwc_otg_hcd_qtd_free(qtd);
 	}
+	DWC_SPINUNLOCK_IRQRESTORE(hcd->lock, flags);
 
 	if (hcd->core_if->dma_desc_enable) {
 		dwc_otg_hcd_qh_free_ddma(hcd, qh);
@@ -75,8 +78,9 @@ void dwc_otg_hcd_qh_free(dwc_otg_hcd_t * hcd, dwc_otg_qh_t * qh)
 		DWC_DMA_FREE(buf_size, qh->dw_align_buf, qh->dw_align_buf_dma);
 	}
 
+	DWC_SPINLOCK_IRQSAVE(hcd->lock, &flags);
 	DWC_FREE(qh);
-	DWC_SPINUNLOCK(hcd->lock);
+	DWC_SPINUNLOCK_IRQRESTORE(hcd->lock, flags);
 	return;
 }
 
@@ -191,6 +195,7 @@ void qh_init(dwc_otg_hcd_t * hcd, dwc_otg_qh_t * qh, dwc_otg_hcd_urb_t * urb)
 			    dwc_otg_hcd_get_ep_num(&urb->pipe_info), hub_addr,
 			    hub_port);
 		qh->do_split = 1;
+		qh->skip_count = 0;
 	}
 
 	if (qh->ep_type == UE_INTERRUPT || qh->ep_type == UE_ISOCHRONOUS) {
@@ -737,6 +742,9 @@ void dwc_otg_hcd_qh_remove(dwc_otg_hcd_t * hcd, dwc_otg_qh_t * qh)
 			    hcd->non_periodic_qh_ptr->next;
 		}
 		DWC_LIST_REMOVE_INIT(&qh->qh_list_entry);
+
+		// If we've removed the last non-periodic entry then there are none left!
+		g_np_count = g_np_sent;
 	} else {
 		deschedule_periodic(hcd, qh);
 		hcd->periodic_qh_count--;
@@ -781,6 +789,7 @@ void dwc_otg_hcd_qh_deactivate(dwc_otg_hcd_t * hcd, dwc_otg_qh_t * qh,
 				g_np_sent = g_np_count;
 			}
 		}
+
 
 		dwc_otg_hcd_qh_remove(hcd, qh);
 		if (!DWC_CIRCLEQ_EMPTY(&qh->qtd_list)) {
@@ -913,6 +922,7 @@ void dwc_otg_hcd_qtd_init(dwc_otg_qtd_t * qtd, dwc_otg_hcd_urb_t * urb)
  * QH to place the QTD into.  If it does not find a QH, then it will create a
  * new QH. If the QH to which the QTD is added is not currently scheduled, it
  * is placed into the proper schedule based on its EP type.
+ * HCD lock must be held and interrupts must be disabled on entry
  *
  * @param[in] qtd The QTD to add
  * @param[in] hcd The DWC HCD structure
@@ -925,8 +935,6 @@ int dwc_otg_hcd_qtd_add(dwc_otg_qtd_t * qtd,
 			dwc_otg_hcd_t * hcd, dwc_otg_qh_t ** qh, int atomic_alloc)
 {
 	int retval = 0;
-	dwc_irqflags_t flags;
-
 	dwc_otg_hcd_urb_t *urb = qtd->urb;
 
 	/*
@@ -940,15 +948,12 @@ int dwc_otg_hcd_qtd_add(dwc_otg_qtd_t * qtd,
 			goto done;
 		}
 	}
-	DWC_SPINLOCK_IRQSAVE(hcd->lock, &flags);
 	retval = dwc_otg_hcd_qh_add(hcd, *qh);
 	if (retval == 0) {
 		DWC_CIRCLEQ_INSERT_TAIL(&((*qh)->qtd_list), qtd,
 					qtd_list_entry);
 		qtd->qh = *qh;
 	}
-	DWC_SPINUNLOCK_IRQRESTORE(hcd->lock, flags);
-
 done:
 
 	return retval;

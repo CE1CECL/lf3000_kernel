@@ -209,5 +209,6 @@
 #include "gpio/cfg_gpio_glasgow_alpha.h"
 #include "gpio/cfg_gpio_glasgow_beta.h"
 #include "gpio/cfg_gpio_xanadu_alpha.h"
+#include "gpio/cfg_gpio_lowcost_alpha.h"
 
 #endif	/* __CFG_GPIO_H__ */

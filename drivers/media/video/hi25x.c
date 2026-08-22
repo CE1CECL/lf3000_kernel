@@ -1,9 +1,9 @@
-/* linux/drivers/media/video/hi253.c
+/* linux/drivers/media/video/hi25x.c
  *
  * Copyright 2013 LeapFrog Enterprises Firmware Engineering
  * Based on Samsung driver for V4L2 Media API (Nexell compatible)
  *
- * Driver for Hynix HI253 (UXGA camera)
+ * Driver for Himax imaging HI253&HI256 (UXGA camera)
  * 2.0Mp CMOS Image Sensor SoC with an Embedded Image Processor
  *
  * This program is free software; you can redistribute it and/or modify
@@ -22,22 +22,27 @@
 #include <linux/slab.h>
 #include <linux/completion.h>
 #include <media/v4l2-ctrls.h>
+#include <linux/v4l2-mediabus.h>
 
-#if defined(CONFIG_PLAT_NXP4330_CABO) || defined(CONFIG_PLAT_NXP4330_LOWCOST)
+#if defined(CONFIG_PLAT_NXP4330_CABO)
 #define PLLX(x)		(x | 0x03)
 #else
 #define PLLX(x)		(x | 0x03)
 #endif
+#define IS_PLL_2X	(PLLX(0x00) == 0x03)
+#define IS_PLL_1_5X	(PLLX(0x00) == 0x02)
 
 #define FLIP(x)		(x | 0x03)
+
 #include "lf2000/hynix_yac_regs.h"
-#include "lf2000/hi253_default.h"
-#include "lf2000/hi253_capture.h"
-#include "hi253.h"
+#include "lf2000/hi25x_default.h"
+#include "lf2000/hi25x_capture.h"
 
-#define ADDR_HI253 	0x20
 
-#define HI253_DRIVER_NAME	"HI253"
+
+#define ADDR_HI25X 	0x20
+
+#define HI25X_DRIVER_NAME	"HI25X"
 
 #define NUM_CTRLS           11
 
@@ -53,6 +58,13 @@
 
 #define USE_READBACK		0
 #define MAX_RETRY   		10
+
+enum {
+	HI253=3,
+	HI256=6,
+};
+
+static unsigned int DEVNAME = 0;
 
 static const unsigned char REG_MAP[NO_SUCH_PAGE] = {
 	[WINDOW_PAGE]		= 0x00,
@@ -72,8 +84,22 @@ static const unsigned char REG_MAP[NO_SUCH_PAGE] = {
 	[UNDOC_0x03_PAGE]	= 0x03,
 };
 
+static inline void hi25x_clamp_format_size(struct v4l2_mbus_framefmt *_fmt) {
+// Clamp format size to one of native sensor sizes	
+	if (_fmt->width <= 400 && _fmt->height <= 300) {
+		_fmt->width = 400;
+		_fmt->height = 300;
+	}else if (_fmt->width <= 800 && _fmt->height <= 600) {
+		_fmt->width = 800;
+		_fmt->height = 600;
+	}else {
+		_fmt->width = 1600;
+		_fmt->height = 1200;
+	}
+}
 
-static int read_device_id_for_hi253(struct i2c_client *client);
+
+static int read_device_id_for_hi25x(struct i2c_client *client);
 
 /*
  * Specification
@@ -82,7 +108,7 @@ static int read_device_id_for_hi253(struct i2c_client *client);
  * FPS : 15fps @UXGA, 30fps @SVGA, QVGA
  */
 
-struct hi253_state {
+struct hi25x_state {
     struct v4l2_subdev sd;
     struct media_pad pad;
     struct v4l2_ctrl_handler handler;
@@ -108,19 +134,19 @@ struct hi253_state {
     int retry_errors;
 };
 
-static inline struct hi253_state *to_state(struct v4l2_subdev *sd)
+static inline struct hi25x_state *to_state(struct v4l2_subdev *sd)
 {
-    return container_of(sd, struct hi253_state, sd);
+    return container_of(sd, struct hi25x_state, sd);
 }
 
 static inline struct v4l2_subdev *ctrl_to_sd(struct v4l2_ctrl *ctrl)
 {
-    return &container_of(ctrl->handler, struct hi253_state, handler)->sd;
+    return &container_of(ctrl->handler, struct hi25x_state, handler)->sd;
 }
 
-static inline struct hi253_state *client_to_priv(const struct i2c_client *client)
+static inline struct hi25x_state *client_to_priv(const struct i2c_client *client)
 {
-	return container_of(i2c_get_clientdata(client), struct hi253_state, sd);
+	return container_of(i2c_get_clientdata(client), struct hi25x_state, sd);
 }
 
 static unsigned char i2c_read_reg(struct i2c_client *client, unsigned char reg_h, unsigned char reg)
@@ -140,7 +166,7 @@ static unsigned char i2c_read_reg(struct i2c_client *client, unsigned char reg_h
     return i2c_data[1];
 }
 
-static inline int hi253_i2c_write(struct i2c_client *client, unsigned char buf[], int length)
+static inline int hi25x_i2c_write(struct i2c_client *client, unsigned char buf[], int length)
 {
     struct i2c_msg msg = {client->addr, 0, length, buf};
     return i2c_transfer(client->adapter, &msg, 1) == 1 ? 0 : -EIO;
@@ -152,7 +178,7 @@ static int hi253_write_regs(struct i2c_client *client, unsigned char (*regvals)[
     int i, err = 0;
     static unsigned char page = NO_SUCH_PAGE;
     int retry = 0;
-    struct hi253_state* state = client_to_priv(client);
+    struct hi25x_state* state = client_to_priv(client);
 
     for (i = 0; i < size ; i++) {
            if (page != REG_MAP[regvals[i][0]]) {
@@ -161,7 +187,7 @@ static int hi253_write_regs(struct i2c_client *client, unsigned char (*regvals)[
            		tmp[1] =(unsigned char)( page );
 
 				do {
-					err = hi253_i2c_write(client, tmp , 2);
+					err = hi25x_i2c_write(client, tmp , 2);
 					//printk("%s: %02x: %02x\n", __func__, tmp[0], tmp[1]);
 #if USE_READBACK
 					tmp[2] = i2c_read_reg(client, 0, tmp[0]);
@@ -183,7 +209,7 @@ static int hi253_write_regs(struct i2c_client *client, unsigned char (*regvals)[
             tmp[1] =(unsigned char)( regvals[i][2] );
 
             do {
-				err = hi253_i2c_write(client, tmp , 2);
+				err = hi25x_i2c_write(client, tmp , 2);
 				//printk("%s: %02x: %02x\n", __func__, tmp[0], tmp[1]);
 
 				if (err < 0)
@@ -206,6 +232,72 @@ static int hi253_write_regs(struct i2c_client *client, unsigned char (*regvals)[
 
     return err;
 }
+
+static int hi256_write_regs(struct i2c_client *client, unsigned char (*regvals)[2], int size)
+{
+    unsigned char tmp[2];
+    unsigned char readBack=0;
+    int i, write_err = 0;
+    
+    int retry = 0;
+    struct hi25x_state* state = client_to_priv(client);
+
+     //regvals[][0] is reg_h ;  regvals[][1] is reg_l ;  regvals[][2] is value ;  
+
+    for (i = 0; i < size ; i++) {
+		
+            tmp[0] =(unsigned char)( regvals[i][0] );  //reg high//reg
+            tmp[1] =(unsigned char)( regvals[i][1] );  //reg low //data
+          
+		
+            do {
+				write_err = hi25x_i2c_write(client, tmp , 2);     
+        //for 2byte register , need hi256_i2c_write(client, tmp , 3), tmp needs to be {addr_h,addr_l,data} 1bye for each 
+        
+        
+				//printk("%s: %02x: %02x %02x, %d\n", __func__, tmp[0], tmp[1], tmp[2], write_err);
+
+				if (write_err < 0)
+				{
+					#if 1	//modified by Terence
+					pr_info("%s: register set failed for %02x: %02x, error = %d\n", __func__,  tmp[0], tmp[1], write_err);
+					#else
+					pr_err("%s: register set failed for %02x: %02x: %02x, error = %d\n", __func__,  tmp[0], tmp[1], tmp[2], write_err);
+					#endif
+				}
+				else
+				{
+					//pr_info("%s: register set success for %02x: %02x: %02x, error = %d\n", __func__,  tmp[0], tmp[1], tmp[2], write_err);				
+				}
+				readBack = i2c_read_reg(client, tmp[0], tmp[1]);	
+				//pr_info("%s: register Value for readBack: %02x  h:%02x: l:%02x, val%02x\n", __func__, readBack, tmp[0], tmp[1], tmp[2]);		
+#if USE_READBACK
+				readBack = i2c_read_reg(client, tmp[0]);
+				if (readBack != tmp[1]) {
+					#if 1	//modified by Terence					
+					pr_info("%s: register set failed for readBack: %02x :%02x, val%02x\n", __func__, readBack, tmp[0], tmp[1]);
+					#else
+					pr_err("%s: register set failed for readBack: %02x  h:%02x: l:%02x, val%02x\n", __func__, readBack, tmp[0], tmp[1], tmp[2]);					
+					#endif
+					write_err = -EAGAIN;
+				}
+				else
+				{
+					pr_info("%s: register set success for readBack: %02x :%02x, val%02x\n", __func__, readBack, tmp[0], tmp[1]);
+				}
+#endif
+            } while (write_err < 0 && ++retry < MAX_RETRY);
+
+            if (retry) {
+				state->readback_errors++;
+				state->retry_errors += retry;
+				retry = 0;
+			}
+    }
+	
+    return write_err;
+}
+
 
 static int hi253_write(struct i2c_client *client, unsigned char page, unsigned char reg, unsigned char val)
 {
@@ -237,7 +329,7 @@ static int hi253_modify(struct i2c_client *client, unsigned char page, unsigned 
 }
 
 static struct v4l2_rect *
-_get_pad_crop(struct hi253_state *me, struct v4l2_subdev_fh *fh,
+_get_pad_crop(struct hi25x_state *me, struct v4l2_subdev_fh *fh,
         unsigned int pad, enum v4l2_subdev_format_whence which)
 {
     switch (which) {
@@ -251,22 +343,34 @@ _get_pad_crop(struct hi253_state *me, struct v4l2_subdev_fh *fh,
     }
 }
 
-static int hi253_set_frame_size(struct v4l2_subdev *sd, int mode, int width, int height)
+static int hi25x_set_frame_size(struct v4l2_subdev *sd, int mode, int width, int height)
 {
     struct i2c_client *client = v4l2_get_subdevdata(sd);
 
-    printk("%s\n", __func__);
+    pr_debug("%s\n", __func__);
 
-    if (width > 800 || height > 600)
-        return hi253_write_regs(client, (unsigned char(*)[3])HI253_Capture_UXGA, ARRAY_SIZE(HI253_Capture_UXGA));
-    else if (width > 400 || height > 300)
-        return hi253_write_regs(client, (unsigned char(*)[3])HI253_Capture_SVGA, ARRAY_SIZE(HI253_Capture_SVGA));
-    return hi253_write_regs(client, (unsigned char(*)[3])HI253_Capture_QSVGA, ARRAY_SIZE(HI253_Capture_QSVGA));
+    switch (DEVNAME) {
+    case HI253 :
+    	if (width > 800 || height > 600)
+        	return hi253_write_regs(client, (unsigned char(*)[3])HI253_Capture_UXGA, ARRAY_SIZE(HI253_Capture_UXGA));
+    	else if (width > 400 || height > 300)
+       		 return hi253_write_regs(client, (unsigned char(*)[3])HI253_Capture_SVGA, ARRAY_SIZE(HI253_Capture_SVGA));
+    	return hi253_write_regs(client, (unsigned char(*)[3])HI253_Capture_QSVGA, ARRAY_SIZE(HI253_Capture_QSVGA));
+		
+    case HI256 :
+	if (width > 800 || height > 600)
+		return hi256_write_regs(client, (unsigned char(*)[2])HI256_Capture_UXGA, ARRAY_SIZE(HI256_Capture_UXGA));
+   	else if (width > 400 || height > 300)
+		return hi256_write_regs(client, (unsigned char(*)[2])HI256_Capture_SVGA, ARRAY_SIZE(HI256_Capture_SVGA));
+	return hi256_write_regs(client, (unsigned char(*)[2])HI256_Capture_QSVGA, ARRAY_SIZE(HI256_Capture_QSVGA));
+	default :
+		return -1;
+    }
 }
 
-static int hi253_s_crop(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh, struct v4l2_subdev_crop *crop)
+static int hi25x_s_crop(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh, struct v4l2_subdev_crop *crop)
 {
-    struct hi253_state *state = to_state(sd);
+    struct hi25x_state *state = to_state(sd);
     struct v4l2_rect *__crop = _get_pad_crop(state, fh, crop->pad, crop->which);
 
     if ((crop->rect.left + crop->rect.width) > MAX_WIDTH ||
@@ -283,10 +387,10 @@ static int hi253_s_crop(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh, struc
     return 0;
 }
 
-static int hi253_g_crop(struct v4l2_subdev *sd,
+static int hi25x_g_crop(struct v4l2_subdev *sd,
         struct v4l2_subdev_fh *fh, struct v4l2_subdev_crop *crop)
 {
-    struct hi253_state *state = to_state(sd);
+    struct hi25x_state *state = to_state(sd);
     struct v4l2_rect *__crop = _get_pad_crop(state, fh, crop->pad, crop->which);
     crop->rect = *__crop;
     return 0;
@@ -308,47 +412,66 @@ static int _hi253_get_default(const char key, char* value)
    return -1;
 }
 
-static int hi253_s_fmt(struct v4l2_subdev *sd,
+static int hi25x_s_fmt(struct v4l2_subdev *sd,
         struct v4l2_subdev_fh *fh, struct v4l2_subdev_format *fmt)
 {
     int err = 0;
     struct v4l2_mbus_framefmt *_fmt = &fmt->format;
-    struct hi253_state *state = to_state(sd);
+    struct hi25x_state *state = to_state(sd);
     struct i2c_client *client = v4l2_get_subdevdata(sd);
     char default_vdoctl2;
-    
-    printk("==========> %s\n", __func__);
+    char tmp[2];
+
+    pr_debug("==========> %s\n", __func__);
     if (!state->inited) {
         pr_err("%s: device is not initialized!!!\n", __func__);
         return -EINVAL;
     }
-
-    if(_hi253_get_default(VDOCTL2, &default_vdoctl2) < 0) {
-       pr_err("%s: no default VDOCTL2 value\n", __func__);
-       return -EINVAL;
-    }
-    
-    printk("%s: vidoctl2 default = 0x%02x\n", __func__, default_vdoctl2);
-    
+ 
 	// Clamp format size to one of native sensor sizes
-    hi253_clamp_format_size(_fmt);
+    hi25x_clamp_format_size(_fmt);
 
     pr_debug("%s: %dx%d\n", __func__, _fmt->width, _fmt->height);
     state->width = _fmt->width;
     state->height = _fmt->height;
-    printk("%s: mode %d, %dx%d\n", __func__, state->mode, state->width, state->height);
-    err = hi253_set_frame_size(sd, state->mode, state->width, state->height);
+    pr_debug("%s: mode %d, %dx%d\n", __func__, state->mode, state->width, state->height);
+    err = hi25x_set_frame_size(sd, state->mode, state->width, state->height);
 
-    printk("%s: %s\n", __func__, sd->name);
-    
-    if (strstr(sd->name, "0-0020"))
-    	hi253_modify(client, WINDOW_PAGE, VDOCTL2, default_vdoctl2, 0x00);
-    else
-    	hi253_modify(client, WINDOW_PAGE, VDOCTL2, 0x00, default_vdoctl2 & 0x02);
+    pr_debug("%s: %s\n", __func__, sd->name);
+
+   switch (DEVNAME) {
+   case HI253 :
+	if(_hi253_get_default(VDOCTL2, &default_vdoctl2) < 0) {
+	 	pr_err("%s: no default VDOCTL2 value\n", __func__);
+		return -EINVAL;
+   	 }
+    	pr_debug("%s: vidoctl2 default = 0x%02x\n", __func__, default_vdoctl2);
+   	if (strstr(sd->name, "0-0020"))
+		hi253_modify(client, WINDOW_PAGE, VDOCTL2, default_vdoctl2, 0x00);
+	else
+		hi253_modify(client, WINDOW_PAGE, VDOCTL2, 0x00, default_vdoctl2 & 0x02);
+   	break;
+	
+   case HI256 :
+   	if (strstr(sd->name, "1-0020")) {	//  FRONT CAMERA
+		tmp[0] = 0x11;
+		tmp[1] = 0x91;
+		hi25x_i2c_write(client, tmp , 2);
+	} else {
+		tmp[0] = 0x11;
+		tmp[1] = 0x93;
+		hi25x_i2c_write(client, tmp , 2);
+   	 }
+	break;
+	
+   default:
+   	break;
+   }
+   
     return err;
 }
 
-static int hi253_set_af(struct v4l2_subdev *sd, int value)
+static int hi25x_set_af(struct v4l2_subdev *sd, int value)
 {
 #if 0
     struct i2c_client *client = v4l2_get_subdevdata(sd);
@@ -368,7 +491,7 @@ enum {
     WB_MAX
 };
 
-static int hi253_set_wb(struct v4l2_subdev *sd, int value)
+static int hi25x_set_wb(struct v4l2_subdev *sd, int value)
 {
 #if 0
     int err;
@@ -391,7 +514,7 @@ enum {
     COLORFX_MAX
 };
 
-static int hi253_set_colorfx(struct v4l2_subdev *sd, int value)
+static int hi25x_set_colorfx(struct v4l2_subdev *sd, int value)
 {
 #if 0
 	int err;
@@ -404,7 +527,7 @@ static int hi253_set_colorfx(struct v4l2_subdev *sd, int value)
 
 #define MIN_EXPOSURE    -4
 #define MAX_EXPOSURE     4
-static int hi253_set_exposure(struct v4l2_subdev *sd, int value)
+static int hi25x_set_exposure(struct v4l2_subdev *sd, int value)
 {
 #if 0
 	int err;
@@ -424,7 +547,7 @@ enum {
     SCENE_MAX
 };
 
-static int hi253_set_scene(struct v4l2_subdev *sd, int value)
+static int hi25x_set_scene(struct v4l2_subdev *sd, int value)
 {
 #if 0
     int err;
@@ -442,7 +565,7 @@ enum {
     ANTI_SHAKE_MAX
 };
 
-static int hi253_set_antishake(struct v4l2_subdev *sd, int value)
+static int hi25x_set_antishake(struct v4l2_subdev *sd, int value)
 {
 #if 0
     int err;
@@ -453,12 +576,12 @@ static int hi253_set_antishake(struct v4l2_subdev *sd, int value)
     return 0;
 }
 
-static int hi253_mode_change(struct v4l2_subdev *sd, int value)
+static int hi25x_mode_change(struct v4l2_subdev *sd, int value)
 {
-    struct hi253_state *state = to_state(sd);
+    struct hi25x_state *state = to_state(sd);
     int err = 0;
 
-    printk("%s: mode %d\n", __func__, value);
+    pr_debug("%s: mode %d\n", __func__, value);
 
     if (unlikely(value < PREVIEW_MODE || value > CAPTURE_MODE)) {
         pr_err("%s: invalid value(%d)\n", __func__, value);
@@ -467,7 +590,7 @@ static int hi253_mode_change(struct v4l2_subdev *sd, int value)
 
     if (state->mode != value) {
         state->mode = value;
-        err = hi253_set_frame_size(sd, value, state->width, state->height);
+        err = hi25x_set_frame_size(sd, value, state->width, state->height);
     }
 
     return err;
@@ -479,69 +602,77 @@ static int hi253_mode_change(struct v4l2_subdev *sd, int value)
 
 #define ADJ_SATR(x)	((x + 0x10 < 0xFF) ? x + 0x10 : 0xFF)
 
-static int hi253_s_ctrl(struct v4l2_ctrl *ctrl)
+static int hi25x_s_ctrl(struct v4l2_ctrl *ctrl)
 {
     struct v4l2_subdev *sd = ctrl_to_sd(ctrl);
     struct i2c_client *client = v4l2_get_subdevdata(sd);
     int value = ctrl->val;
     int err = 0;
 
-    printk("%s: id(0x%x), value(%d)\n", __func__, ctrl->id, value);
+    pr_debug("%s: id(0x%x), value(%d)\n", __func__, ctrl->id, value);
 
     switch (ctrl->id) {
 		case V4L2_CID_BRIGHTNESS:
-			hi253_modify(client, FORMAT_PAGE, ISPCTL3, 0x10, 0x00);
-			if (ctrl->val >= 0x80)
-				hi253_write(client, FORMAT_PAGE, YOFS, ctrl->val - 0x80);
-			else
-				hi253_write(client, FORMAT_PAGE, YOFS, 0xFF - ctrl->val);
+			if (HI253 == DEVNAME) {
+				hi253_modify(client, FORMAT_PAGE, ISPCTL3, 0x10, 0x00);
+				if (ctrl->val >= 0x80)
+					hi253_write(client, FORMAT_PAGE, YOFS, ctrl->val - 0x80);
+				else
+					hi253_write(client, FORMAT_PAGE, YOFS, 0xFF - ctrl->val);
+			}
 			break;
 
 		case V4L2_CID_CONTRAST:
-			hi253_modify(client, FORMAT_PAGE, ISPCTL4, 0x02, 0x00);
-			hi253_write(client, FORMAT_PAGE, CONTRAST, ctrl->val);
+			if (HI253 == DEVNAME) {
+				hi253_modify(client, FORMAT_PAGE, ISPCTL4, 0x02, 0x00);
+				hi253_write(client, FORMAT_PAGE, CONTRAST, ctrl->val);
+			}
 			break;
 
 		case V4L2_CID_SATURATION:
-			hi253_modify(client, FORMAT_PAGE, SATCTL, 0x01, 0x00);
-			hi253_write(client, FORMAT_PAGE, SATB, ctrl->val);
-			hi253_write(client, FORMAT_PAGE, SATR, ADJ_SATR(ctrl->val));
+			if (HI253 == DEVNAME) {
+				hi253_modify(client, FORMAT_PAGE, SATCTL, 0x01, 0x00);
+				hi253_write(client, FORMAT_PAGE, SATB, ctrl->val);
+				hi253_write(client, FORMAT_PAGE, SATR, ADJ_SATR(ctrl->val));
+			}
 			break;
 
 		case V4L2_CID_AUTO_WHITE_BALANCE:
-			if (ctrl->val)
-				hi253_modify(client, AUTOWB_PAGE, AWBCTL1, 0x80, 0x00);
-			else
-				hi253_modify(client, AUTOWB_PAGE, AWBCTL1, 0x00, 0x80);
+			if (HI253 == DEVNAME) {
+				if (ctrl->val)
+					hi253_modify(client, AUTOWB_PAGE, AWBCTL1, 0x80, 0x00);
+				else
+					hi253_modify(client, AUTOWB_PAGE, AWBCTL1, 0x00, 0x80);
+			}
 			break;
 
         case V4L2_CID_FOCUS_AUTO:
-            err = hi253_set_af(sd, value);
+            err = hi25x_set_af(sd, value);
             break;
 
         case V4L2_CID_DO_WHITE_BALANCE:
-            err = hi253_set_wb(sd, value);
+            err = hi25x_set_wb(sd, value);
             break;
 
         case V4L2_CID_COLORFX:
-            err = hi253_set_colorfx(sd, value);
+            err = hi25x_set_colorfx(sd, value);
             break;
 
         case V4L2_CID_EXPOSURE:
-            err = hi253_set_exposure(sd, value);
+            err = hi25x_set_exposure(sd, value);
             break;
 
         /* custom */
         case V4L2_CID_CAMERA_SCENE_MODE:
-            err = hi253_set_scene(sd, value);
+            err = hi25x_set_scene(sd, value);
             break;
 
         case V4L2_CID_CAMERA_ANTI_SHAKE:
-            err = hi253_set_antishake(sd, value);
+            err = hi25x_set_antishake(sd, value);
             break;
 
         case V4L2_CID_CAMERA_MODE_CHANGE:
-            err = hi253_mode_change(sd, value);
+            err = hi25x_mode_change(sd, value);
             break;
 
         default:
@@ -552,13 +683,13 @@ static int hi253_s_ctrl(struct v4l2_ctrl *ctrl)
     return err;
 }
 
-static const struct v4l2_ctrl_ops hi253_ctrl_ops = {
-    .s_ctrl = hi253_s_ctrl,
+static const struct v4l2_ctrl_ops hi25x_ctrl_ops = {
+    .s_ctrl = hi25x_s_ctrl,
 };
 
-static const struct v4l2_ctrl_config hi253_custom_ctrls[] = {
+static const struct v4l2_ctrl_config hi25x_custom_ctrls[] = {
     {
-        .ops    = &hi253_ctrl_ops,
+        .ops    = &hi25x_ctrl_ops,
         .id     = V4L2_CID_CAMERA_SCENE_MODE,
         .type   = V4L2_CTRL_TYPE_INTEGER,
         .name   = "SceneMode",
@@ -567,7 +698,7 @@ static const struct v4l2_ctrl_config hi253_custom_ctrls[] = {
         .def    = 0,
         .step   = 1,
     }, {
-        .ops    = &hi253_ctrl_ops,
+        .ops    = &hi25x_ctrl_ops,
         .id     = V4L2_CID_CAMERA_ANTI_SHAKE,
         .type   = V4L2_CTRL_TYPE_INTEGER,
         .name   = "AntiShake",
@@ -576,7 +707,7 @@ static const struct v4l2_ctrl_config hi253_custom_ctrls[] = {
         .def    = 0,
         .step   = 1,
     }, {
-        .ops    = &hi253_ctrl_ops,
+        .ops    = &hi25x_ctrl_ops,
         .id     = V4L2_CID_CAMERA_MODE_CHANGE,
         .type   = V4L2_CTRL_TYPE_INTEGER,
         .name   = "ModeChange",
@@ -587,62 +718,62 @@ static const struct v4l2_ctrl_config hi253_custom_ctrls[] = {
     },
 };
 
-static int hi253_initialize_ctrls(struct hi253_state *state)
+static int hi25x_initialize_ctrls(struct hi25x_state *state)
 {
     v4l2_ctrl_handler_init(&state->handler, NUM_CTRLS);
 
     /* standard */
-    state->focus = v4l2_ctrl_new_std(&state->handler, &hi253_ctrl_ops,
+    state->focus = v4l2_ctrl_new_std(&state->handler, &hi25x_ctrl_ops,
             V4L2_CID_FOCUS_AUTO, 0, 1, 1, 0);
     if (!state->focus) {
         pr_err("%s: failed to create focus ctrl\n", __func__);
         return -1;
     }
-    state->wb = v4l2_ctrl_new_std(&state->handler, &hi253_ctrl_ops,
+    state->wb = v4l2_ctrl_new_std(&state->handler, &hi25x_ctrl_ops,
             V4L2_CID_DO_WHITE_BALANCE, WB_AUTO, WB_MAX - 1, 1, WB_AUTO);
     if (!state->wb) {
         pr_err("%s: failed to create wb ctrl\n", __func__);
         return -1;
     }
-    state->color_effect = v4l2_ctrl_new_std_menu(&state->handler, &hi253_ctrl_ops,
+    state->color_effect = v4l2_ctrl_new_std_menu(&state->handler, &hi25x_ctrl_ops,
             V4L2_CID_COLORFX, COLORFX_MAX - 1, 0, COLORFX_NONE);
     if (!state->color_effect) {
         pr_err("%s: failed to create color_effect ctrl\n", __func__);
         return -1;
     }
-    state->exposure = v4l2_ctrl_new_std(&state->handler, &hi253_ctrl_ops,
-            V4L2_CID_EXPOSURE, MIN_EXPOSURE, MAX_EXPOSURE, 1, 0);
+    state->exposure = v4l2_ctrl_new_std_menu(&state->handler, &hi25x_ctrl_ops,
+            V4L2_CID_EXPOSURE, MAX_EXPOSURE, 1, 0);
     if (!state->exposure) {
         pr_err("%s: failed to create exposure ctrl\n", __func__);
         return -1;
     }
 
     /* custom */
-    state->scene_mode = v4l2_ctrl_new_custom(&state->handler, &hi253_custom_ctrls[0], NULL);
+    state->scene_mode = v4l2_ctrl_new_custom(&state->handler, &hi25x_custom_ctrls[0], NULL);
     if (!state->scene_mode) {
         pr_err("%s: failed to create scene_mode ctrl\n", __func__);
         return -1;
     }
-    state->anti_shake = v4l2_ctrl_new_custom(&state->handler, &hi253_custom_ctrls[1], NULL);
+    state->anti_shake = v4l2_ctrl_new_custom(&state->handler, &hi25x_custom_ctrls[1], NULL);
     if (!state->anti_shake) {
         pr_err("%s: failed to create anti_shake ctrl\n", __func__);
         return -1;
     }
-    state->mode_change = v4l2_ctrl_new_custom(&state->handler, &hi253_custom_ctrls[2], NULL);
+    state->mode_change = v4l2_ctrl_new_custom(&state->handler, &hi25x_custom_ctrls[2], NULL);
     if (!state->mode_change) {
         pr_err("%s: failed to create mode_change ctrl\n", __func__);
         return -1;
     }
 
     // HI253 controls
-    v4l2_ctrl_new_std(&state->handler, &hi253_ctrl_ops, V4L2_CID_BRIGHTNESS, 0x00, 0xFF, 1, 0x7B);
-    v4l2_ctrl_new_std(&state->handler, &hi253_ctrl_ops, V4L2_CID_CONTRAST  , 0x00, 0xFF, 1, 0x84);
-    v4l2_ctrl_new_std(&state->handler, &hi253_ctrl_ops, V4L2_CID_SATURATION, 0x00, 0xFF, 1, 0x90);
-    v4l2_ctrl_new_std(&state->handler, &hi253_ctrl_ops, V4L2_CID_AUTO_WHITE_BALANCE, 0, 1, 1, 1);
+    v4l2_ctrl_new_std(&state->handler, &hi25x_ctrl_ops, V4L2_CID_BRIGHTNESS, 0x00, 0xFF, 1, 0x7B);
+    v4l2_ctrl_new_std(&state->handler, &hi25x_ctrl_ops, V4L2_CID_CONTRAST  , 0x00, 0xFF, 1, 0x84);
+    v4l2_ctrl_new_std(&state->handler, &hi25x_ctrl_ops, V4L2_CID_SATURATION, 0x00, 0xFF, 1, 0x90);
+    v4l2_ctrl_new_std(&state->handler, &hi25x_ctrl_ops, V4L2_CID_AUTO_WHITE_BALANCE, 0, 1, 1, 1);
 
     state->sd.ctrl_handler = &state->handler;
     if (state->handler.error) {
-        printk("%s: ctrl handler error(%d)\n", __func__, state->handler.error);
+        pr_err("%s: ctrl handler error(%d)\n", __func__, state->handler.error);
         v4l2_ctrl_handler_free(&state->handler);
         return -1;
     }
@@ -650,25 +781,25 @@ static int hi253_initialize_ctrls(struct hi253_state *state)
     return 0;
 }
 
-
-static int hi253_connected_check(struct i2c_client *client)
+static int hi25x_connected_check(struct i2c_client *client)
 {
-    if (read_device_id_for_hi253(client) == HI253_ID) // HI253
+    if ((HI253 == DEVNAME && read_device_id_for_hi25x(client) == HI253_ID) || 
+		(HI256 == DEVNAME && read_device_id_for_hi25x(client) == HI256_ID))
         return 0;
     return -1;
 }
 
-static int hi253_init(struct v4l2_subdev *sd, u32 val)
+static int hi25x_init(struct v4l2_subdev *sd, u32 val)
 {
     int err = 0;
     struct i2c_client *client = v4l2_get_subdevdata(sd);
-    struct hi253_state *state = to_state(sd);
+    struct hi25x_state *state = to_state(sd);
 
     if (!val) {
         if (!state->inited)
             return 0;
         hi253_modify(client, WINDOW_PAGE, PWRCTL, 0x01, 0x00); // soft sleep
-        printk("hi253_init exit: %s, readback errors = %d, retry attempts = %d\n", sd->name, state->readback_errors, state->retry_errors);
+        pr_info("hi25%d_init exit: %s, readback errors = %d, retry attempts = %d\n", DEVNAME, sd->name, state->readback_errors, state->retry_errors);
         state->readback_errors = 0;
         state->retry_errors = 0;
     	state->inited = false;
@@ -676,14 +807,21 @@ static int hi253_init(struct v4l2_subdev *sd, u32 val)
     }
 
     if (!state->inited) {
-        printk("hi253_init: %s\n", sd->name);
-        hi253_modify(client, WINDOW_PAGE, PWRCTL, 0x02, 0x00); // soft reset
-        hi253_modify(client, WINDOW_PAGE, PWRCTL, 0x00, 0x02);
-        if(hi253_connected_check(client) < 0) {
+        pr_info("hi25%d_init: %s\n", DEVNAME, sd->name);
+	if (HI253 == DEVNAME) {
+       		hi253_modify(client, WINDOW_PAGE, PWRCTL, 0x02, 0x00); // soft reset
+        	hi253_modify(client, WINDOW_PAGE, PWRCTL, 0x00, 0x02);
+	}
+	
+        if(hi25x_connected_check(client) < 0) {
             v4l_info(client, "%s: camera not connected..\n", __func__);
             return -1;
         }
-        err = hi253_write_regs(client, (unsigned char(*)[3])HI253_Default, ARRAY_SIZE(HI253_Default));
+	if (HI253 == DEVNAME)
+        	err = hi253_write_regs(client, (unsigned char(*)[3])HI253_Default, ARRAY_SIZE(HI253_Default));
+	else if (HI256 == DEVNAME)
+		err = hi256_write_regs(client, (unsigned char(*)[2])HI256_Default, ARRAY_SIZE(HI256_Default));
+	
         if (err < 0) {
             pr_err("%s: write reg error(err: %d)\n", __func__, err);
             return err;
@@ -694,27 +832,39 @@ static int hi253_init(struct v4l2_subdev *sd, u32 val)
     return 0;
 }
 
-static int hi253_s_power(struct v4l2_subdev *sd, int on)
+static int hi25x_s_power(struct v4l2_subdev *sd, int on)
 {
-    printk("hi253_s_power: %s: %d\n", sd->name, on);
-    hi253_init(sd, on);
-    return 0;
+    pr_debug("hi25%d_s_power: %s: %d\n", DEVNAME, sd->name, on);
+	/*
+    switch (DEVNAME) {
+    case HI253:
+    	hi253_init(sd, on);
+	break;
+    case HI256:
+    	hi256_init(sd, on);
+	break;
+    default:
+	pr_err("unknown device\n");
+	break;		
+    }
+    */
+    return hi25x_init(sd, on);
 }
 
-static const struct v4l2_subdev_core_ops hi253_core_ops = {
-    .s_power = hi253_s_power,
+static const struct v4l2_subdev_core_ops hi25x_core_ops = {
+    .s_power = hi25x_s_power,
     .s_ctrl = v4l2_subdev_s_ctrl,
 };
 
-static const struct v4l2_subdev_pad_ops hi253_pad_ops = {
-    .set_fmt  = hi253_s_fmt,
-    .set_crop = hi253_s_crop,
-    .get_crop = hi253_g_crop,
+static const struct v4l2_subdev_pad_ops hi25x_pad_ops = {
+    .set_fmt  = hi25x_s_fmt,
+    .set_crop = hi25x_s_crop,
+    .get_crop = hi25x_g_crop,
 };
 
-static const struct v4l2_subdev_ops hi253_ops = {
-    .core = &hi253_core_ops,
-    .pad = &hi253_pad_ops,
+static const struct v4l2_subdev_ops hi25x_ops = {
+    .core = &hi25x_core_ops,
+    .pad = &hi25x_pad_ops,
 };
 
 
@@ -725,58 +875,71 @@ static int _link_setup(struct media_entity *entity,
         const struct media_pad *local,
         const struct media_pad *remote, u32 flags)
 {
-    printk("%s: entered\n", __func__);
+    pr_debug("%s: entered\n", __func__);
     return 0;
 }
 
-static const struct media_entity_operations hi253_media_ops = {
+static const struct media_entity_operations hi25x_media_ops = {
     .link_setup = _link_setup,
 };
 /*
- * hi253_probe
+ * hi25x_probe
  * Fetching platform data is being done with s_config subdev call.
  * In probe routine, we just register subdev device
  */
-static int hi253_probe(struct i2c_client *client,
+static int hi25x_probe(struct i2c_client *client,
         const struct i2c_device_id *id)
 {
-    struct hi253_state *state;
+    struct hi25x_state *state;
     struct v4l2_subdev *sd;
     int ret;
-
-    state = kzalloc(sizeof(struct hi253_state), GFP_KERNEL);
+ 
+    state = kzalloc(sizeof(struct hi25x_state), GFP_KERNEL);
     if (state == NULL)
         return -ENOMEM;
 
     sd = &state->sd;
-    strcpy(sd->name, HI253_DRIVER_NAME);
+    strcpy(sd->name, HI25X_DRIVER_NAME);
+
+    ret = read_device_id_for_hi25x(client);
+    switch (ret) {
+    case HI253_ID: 
+		DEVNAME = HI253;
+		break;
+    case HI256_ID : 
+		DEVNAME = HI256;
+		break;
+    default:
+		DEVNAME = 0;
+		pr_err("unknown device\n");
+		break;
+    }
 
     /* Registering subdev */
-    v4l2_i2c_subdev_init(sd, client, &hi253_ops);
+    v4l2_i2c_subdev_init(sd, client, &hi25x_ops);
 
     sd->flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
     state->pad.flags = MEDIA_PAD_FL_SOURCE;
     sd->entity.type = MEDIA_ENT_T_V4L2_SUBDEV_SENSOR;
-    sd->entity.ops = &hi253_media_ops;
+    sd->entity.ops = &hi25x_media_ops;
     if (media_entity_init(&sd->entity, 1, &state->pad, 0)) {
         dev_err(&client->dev, "%s: failed to media_entity_init()\n", __func__);
         kfree(state);
         return -ENOENT;
     }
 
-    ret = hi253_initialize_ctrls(state);
+    ret = hi25x_initialize_ctrls(state);
     if (ret < 0) {
         pr_err("%s: failed to initialize controls\n", __func__);
         return ret;
     }
-
-    dev_info(&client->dev, "hi253 has been probed\n");
+    dev_info(&client->dev, "hi25%d has been probed\n", DEVNAME);
 
     return 0;
 }
 
 
-static int hi253_remove(struct i2c_client *client)
+static int hi25x_remove(struct i2c_client *client)
 {
     struct v4l2_subdev *sd = i2c_get_clientdata(client);
 
@@ -787,36 +950,38 @@ static int hi253_remove(struct i2c_client *client)
     return 0;
 }
 
-static const struct i2c_device_id hi253_id[] = {
-    { HI253_DRIVER_NAME, 0 },
+static const struct i2c_device_id hi25x_id[] = {
+    { HI25X_DRIVER_NAME, 0 },
     { },
 };
 
-static int read_device_id_for_hi253(struct i2c_client *client)
+static int read_device_id_for_hi25x(struct i2c_client *client)
 {
     int id;
-    client->addr = ADDR_HI253;
+    client->addr = ADDR_HI25X;
     id = i2c_read_reg(client, 0, DEVID);
-    v4l_info(client,"Check for **** Hynix HI253 **** \n");
+	printk("DEVID = %x\n",DEVID);
+	printk("id = %x\n",id);
+    v4l_info(client,"Check for **** Hynix HI25%d**** \n", (id==0x92) ? 3 : 6);
     v4l_info(client,"Chip ID 0x%02x :0x%02x \n",  DEVID, id);
 
     return id;
 }
 
 
-MODULE_DEVICE_TABLE(i2c, hi253_id);
+MODULE_DEVICE_TABLE(i2c, hi25x_id);
 
 static struct i2c_driver _i2c_driver = {
     .driver = {
-        .name = HI253_DRIVER_NAME,
+        .name = HI25X_DRIVER_NAME,
     },
-    .probe    = hi253_probe,
-    .remove   = hi253_remove,
-    .id_table = hi253_id,
+    .probe    = hi25x_probe,
+    .remove   = hi25x_remove,
+    .id_table = hi25x_id,
 };
 
 module_i2c_driver(_i2c_driver);
 
-MODULE_DESCRIPTION("HI253 UXGA camera driver");
+MODULE_DESCRIPTION("HI25X(3, 6) UXGA camera driver");
 MODULE_AUTHOR("Dave Milici <dmilici@leapfrog.com>");
 MODULE_LICENSE("GPL");

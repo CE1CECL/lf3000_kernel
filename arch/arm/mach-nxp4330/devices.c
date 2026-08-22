@@ -620,7 +620,7 @@ static struct platform_device mali_gpu_device =
 static struct nxp_i2s_plat_data i2s_data_ch0 = {
 	.master_mode		= CFG_AUDIO_I2S0_MASTER_MODE,
 	.trans_mode			= CFG_AUDIO_I2S0_TRANS_MODE,
-#if defined(CONFIG_PLAT_NXP4330_R3K) || defined(CONFIG_PLAT_NXP4330_CABO) || defined(CONFIG_PLAT_NXP4330_XANADU)
+#if defined(CONFIG_PLAT_NXP4330_R3K) || defined(CONFIG_PLAT_NXP4330_CABO) || defined(CONFIG_PLAT_NXP4330_XANADU) ||  defined(CONFIG_PLAT_NXP4330_LOWCOST)
 	.frame_bit			= 32, //CFG_AUDIO_I2S0_FRAME_BIT,
 	.sample_rate		= 32000, //CFG_AUDIO_I2S0_SAMPLE_RATE,
 #else
@@ -862,8 +862,8 @@ static void _dwmci_set_io_timing(void *data, unsigned char timing)
 	__raw_writel(clksel, host->regs + DWMCI_CLKSEL);
 	__raw_writel(rddqs, host->regs + DWMCI_DDR200_RDDQS_EN);
 	__raw_writel(dline, host->regs + DWMCI_DDR200_DLINE_CTRL);
-	
-	//printk(KERN_INFO "CLKSEL = 0x%08x\n", 
+
+	//printk(KERN_INFO "CLKSEL = 0x%08x\n",
 	//		__raw_readl(host->regs + DWMCI_CLKSEL));
 }
 
@@ -1009,11 +1009,11 @@ void __init nxp_dwmci_platform_device_register(struct dw_mci_board *mci,
 
 #if defined(CONFIG_BCM43143)
 
-//FIXME (FMirani) : These routines are called when the WIFI driver loads.  
-//                  We are not really doing anything here since tha WIFI module does   
+//FIXME (FMirani) : These routines are called when the WIFI driver loads.
+//                  We are not really doing anything here since tha WIFI module does
 //                  not respond if the WIFI_RESET pin is toggled dynamically. It
-//                  is set to high when the GPIOs are initialized and we are not turning 
-//                  it low any time. 
+//                  is set to high when the GPIOs are initialized and we are not turning
+//                  it low any time.
 
 
 void bcm_wlan_power_on(int param)
@@ -1022,7 +1022,7 @@ void bcm_wlan_power_on(int param)
 //	gpio_set_value(WIFI_RESET, 0);
 //	mdelay(10);
 //	gpio_set_value(WIFI_RESET, 1);
-//	mdelay(1000);	
+//	mdelay(1000);
 }
 
 EXPORT_SYMBOL(bcm_wlan_power_on);
@@ -1041,8 +1041,8 @@ EXPORT_SYMBOL(bcm_wlan_power_off);
 /*------------------------------------------------------------------------------
  * TI WIFI module
  */
-#if defined(CONFIG_WL12XX_PLATFORM_DATA)	
- 
+#if defined(CONFIG_WL12XX_PLATFORM_DATA)
+
 struct wl12xx_platform_data nxp4430_wlan_data;
 #if 1
 static void wl_set_power(u32 slot_id, u32 on)
@@ -1209,21 +1209,25 @@ static struct amba_device spi1_device = {
 
 void otg_clk_enable(void)
 {
+#if 0
     struct clk *hsotg_clk;
 
     // Clock control
     hsotg_clk = clk_get(NULL, DEV_NAME_USB2HOST);
     clk_enable(hsotg_clk);
+#endif
 }
 EXPORT_SYMBOL(otg_clk_enable);
 
 void otg_clk_disable(void)
 {
+#if 0
     struct clk *hsotg_clk;
 
     // Clock control
     hsotg_clk = clk_get(NULL, DEV_NAME_USB2HOST);
     clk_disable(hsotg_clk);
+#endif
 }
 EXPORT_SYMBOL(otg_clk_disable);
 
@@ -1232,40 +1236,68 @@ void otg_phy_init(void)
 {
     u32 temp;
 
+    //PM_DBGOUT("+%s\n", __func__);
+
+    writel(readl(SOC_VA_TIEOFF + 0x3C) & ~0xF800, SOC_VA_TIEOFF + 0x3C);
+
     // 1. Release otg common reset
     writel(readl(SOC_VA_RSTCON + 0x04) & ~(1<<25), SOC_VA_RSTCON + 0x04);     // reset on
-    udelay(1);
+    udelay(10);
     writel(readl(SOC_VA_RSTCON + 0x04) |  (1<<25), SOC_VA_RSTCON + 0x04);     // reset off
-    udelay(1);
+    udelay(10);
+
+    // 1-1. VBUS reconfig - Over current Issue
+#if 1
+    temp  = readl(SOC_VA_TIEOFF + 0x38) & ~(0x7<<23);
+//    temp |= (0x3<<23); // -3%
+//    temp |= (0x2<<23); // -6%
+//    temp |= (0x1<<23); // -9%
+    temp |= (0x0<<23); // -12%
+    writel(temp, SOC_VA_TIEOFF + 0x38);
+#endif
 
     // 2. Program scale mode to real mode
     writel(readl(SOC_VA_TIEOFF + 0x30) & ~(3<<0), SOC_VA_TIEOFF + 0x30);
 
     // 3. Select word interface and enable word interface selection
-    //writel(readl(SOC_VA_TIEOFF + 0x38) & ~(3<<8), SOC_VA_TIEOFF + 0x38);
+#if 0
+    writel(readl(SOC_VA_TIEOFF + 0x38) & ~(3<<8), SOC_VA_TIEOFF + 0x38);
+    writel(readl(SOC_VA_TIEOFF + 0x38) |  (1<<8), SOC_VA_TIEOFF + 0x38);        // 2'b01 8bit, 2'b11 16bit word
+#else
     writel(readl(SOC_VA_TIEOFF + 0x38) |  (3<<8), SOC_VA_TIEOFF + 0x38);        // 2'b01 8bit, 2'b11 16bit word
+#endif
+
 
     // 4. Select VBUS
-    temp    = readl(SOC_VA_TIEOFF + 0x34);
-    temp   |= (3<<24);
-    writel(temp, SOC_VA_TIEOFF + 0x34);
+//    writel(readl(SOC_VA_TIEOFF + 0x34) |  (3<<24), SOC_VA_TIEOFF + 0x34);   /* Select VBUS 3.3V */
+    writel(readl(SOC_VA_TIEOFF + 0x34) & ~(3<<24), SOC_VA_TIEOFF + 0x34);   /* Select VBUS 5V */
 
     // 5. POR of PHY
+#if 0
+    writel(readl(SOC_VA_TIEOFF + 0x34) |  (3<<7), SOC_VA_TIEOFF + 0x34);
+#else
+    temp    = readl(SOC_VA_TIEOFF + 0x34);
     temp   &= ~(3<<7);
     temp   |=  (1<<7);
     writel(temp, SOC_VA_TIEOFF + 0x34);
-    udelay(40); // 40us delay need.
+    udelay(1);
+    temp   |=  (3<<7);
+    writel(temp, SOC_VA_TIEOFF + 0x34);
+    udelay(1);
+    temp   &= ~(2<<7);
+    writel(temp, SOC_VA_TIEOFF + 0x34);
+#endif
+    udelay(10); // 40us delay need.
 
     // 6. UTMI reset
-    temp   |=  (1<<3);
-    writel(temp, SOC_VA_TIEOFF + 0x34);
-    udelay(1); // 10 clock need
+    writel(readl(SOC_VA_TIEOFF + 0x34) | (1<<3), SOC_VA_TIEOFF + 0x34);
+    udelay(1);  // 10 clock need
 
     // 7. AHB reset
-    temp   |=  (1<<2);
-    writel(temp, SOC_VA_TIEOFF + 0x34);
-    udelay(1); // 10 clock need
+    writel(readl(SOC_VA_TIEOFF + 0x34) | (1<<2), SOC_VA_TIEOFF + 0x34);
+    udelay(1);  // 10 clock need
 
+#if 0
     if (GLASGOW == get_leapfrog_platform()) {
         // FIXME: adjust rise time for optimum eye-test result
         temp = readl(SOC_VA_TIEOFF + 0x28);
@@ -1278,40 +1310,31 @@ void otg_phy_init(void)
     printk("%s: %08x : %08x \n", __func__, SOC_VA_TIEOFF + 0x30, readl(SOC_VA_TIEOFF + 0x30));
     printk("%s: %08x : %08x \n", __func__, SOC_VA_TIEOFF + 0x34, readl(SOC_VA_TIEOFF + 0x34));
     printk("%s: %08x : %08x \n", __func__, SOC_VA_TIEOFF + 0x38, readl(SOC_VA_TIEOFF + 0x38));
-
+#endif
 }
 EXPORT_SYMBOL(otg_phy_init);
 
 void otg_phy_off(void)
 {
-    u32 temp;
+    // 0. Select VBUS
+    writel(readl(SOC_VA_TIEOFF + 0x34) |  (3<<24), SOC_VA_TIEOFF + 0x34);   /* Select VBUS 3.3V */
+//    writel(readl(SOC_VA_TIEOFF + 0x34) & ~(3<<24), SOC_VA_TIEOFF + 0x34);   /* Select VBUS 5V */
 
-    temp    = readl(SOC_VA_TIEOFF + 0x34);
-
-    // 1. AHB reset
-#if 0
-    temp   &= ~(1<<2);
-    writel(temp, SOC_VA_TIEOFF + 0x34);
+    // 1. UTMI reset
+    writel(readl(SOC_VA_TIEOFF + 0x34) & ~(1<<3), SOC_VA_TIEOFF + 0x34);
     udelay(10); // 10 clock need
-#endif
 
-    // 2. UTMI reset
-#if 0
-    temp   &= ~(1<<3);
-    writel(temp, SOC_VA_TIEOFF + 0x34);
+    // 2. AHB reset
+    writel(readl(SOC_VA_TIEOFF + 0x34) & ~(1<<2), SOC_VA_TIEOFF + 0x34);
     udelay(10); // 10 clock need
-#endif
 
-    // 3. Release otg common reset
+    // 3. POR of PHY
+    writel(readl(SOC_VA_TIEOFF + 0x34) |  (3<<7), SOC_VA_TIEOFF + 0x34);
+    udelay(10); // 40us delay need.
+
+    // 4. Release otg common reset
     writel(readl(SOC_VA_RSTCON + 0x04) & ~(1<<25), SOC_VA_RSTCON + 0x04);     // reset on
     udelay(10);
-
-    // 4. POR of PHY
-    temp   &= ~(3<<7);
-//    temp   |=  (3<<7);
-    temp   |=  (2<<7);
-    writel(temp, SOC_VA_TIEOFF + 0x34);
-    udelay(40); // 40us delay need.
 }
 EXPORT_SYMBOL(otg_phy_off);
 
@@ -1328,25 +1351,25 @@ static struct resource otg_resources[] = {
     },
 };
 
-static u64 otg_dmamask = 0xffffffffUL;
+static u64 otg_dmamask = DMA_BIT_MASK(32);
 
 static struct platform_device otg_plat_device = {
-    .name   = "dwc3-gadget",
+    .name   = "dwc_otg",
     .id     = -1,
     .dev    = {
-		.dma_mask = &otg_dmamask,
-		.coherent_dma_mask = 0xffffffffUL
+        .dma_mask = &otg_dmamask,
+        .coherent_dma_mask = 0xffffffffUL
     },
     .num_resources  = ARRAY_SIZE(otg_resources),
     .resource       = otg_resources,
 };
 
-#define CFG_SWITCH_USB_5V_EN		(PAD_GPIO_D + 10)
-#define CFG_SWITCH_USB_HOST_DEVICE	(PAD_GPIO_D + 11)
-#define CFG_OTG_MODE_HOST 			1
-#define CFG_OTG_MODE_DEVICE 		0
-#define CFG_OTG_BOOT_MODE 			CFG_OTG_MODE_DEVICE
-#if 0   //defined(CFG_SWITCH_USB_HOST_DEVICE)
+#define CFG_SWITCH_USB_5V_EN        (PAD_GPIO_D + 10)
+#define CFG_SWITCH_USB_HOST_DEVICE  (PAD_GPIO_D + 11)
+#define CFG_OTG_MODE_HOST           1
+#define CFG_OTG_MODE_DEVICE         0
+#define CFG_OTG_BOOT_MODE           CFG_OTG_MODE_DEVICE
+
 static int cur_otg_mode = CFG_OTG_BOOT_MODE;
 
 unsigned int get_otg_mode(void)
@@ -1356,40 +1379,17 @@ unsigned int get_otg_mode(void)
 
 void set_otg_mode(unsigned int mode, int is_force)
 {
-    int io = CFG_SWITCH_USB_HOST_DEVICE;
-
     if (mode > CFG_OTG_MODE_HOST) return;
 
     if ((mode == cur_otg_mode) && !is_force) return;
 
     cur_otg_mode = mode;
 
-printk("set_otg_mode : cur_otg_mode (%d)\n", cur_otg_mode);
-
-    nxp_soc_gpio_set_io_func(io, NX_GPIO_PADFUNC_GPIO);
-    nxp_soc_gpio_set_io_dir(io, 1);
-    nxp_soc_gpio_set_out_value(io, cur_otg_mode);
-
-    io = CFG_SWITCH_USB_5V_EN;
-	nxp_soc_gpio_set_io_func(io, NX_GPIO_PADFUNC_GPIO);
-	nxp_soc_gpio_set_io_dir(io, 1);
-	nxp_soc_gpio_set_out_value(io, cur_otg_mode);
-}
-#else
-unsigned int get_otg_mode(void)
-{
-    return 0;
-}
-
-void set_otg_mode(unsigned int mode, int is_force)
-{
     return;
 }
-#endif /* CFG_SWITCH_USB_HOST_DEVICE */
 
 EXPORT_SYMBOL(get_otg_mode);
 EXPORT_SYMBOL(set_otg_mode);
-
 #endif/* CONFIG_USB_DWCOTG */
 
 /*------------------------------------------------------------------------------
@@ -1627,7 +1627,7 @@ void __init nxp_cpu_devices_register(void)
 	//if (!i)
 		//printk("mach: BT Reset %d %d \n", i, gpio_get_value_cansleep(BT_RESET_L));
 #endif
- 
+
 	/* Register the platform devices */
 	printk("mach: add graphic device opengl|es\n");
 	platform_device_register(&mali_gpu_device);

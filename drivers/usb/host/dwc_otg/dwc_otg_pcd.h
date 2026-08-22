@@ -123,18 +123,6 @@ struct dwc_iso_xreq_port {
 	struct dwc_iso_pkt_desc_port *per_io_frame_descs;
 };
 #endif
-
-/**
- * psw0523 add for dw_align_buf free
- */
-struct free_dw_align_buf {
-    uint8_t   *buf;
-    dwc_dma_t  dma;
-    uint32_t   length;
-
-    struct list_head list;
-};
-
 /** DWC_otg request structure.
  * This structure is a list of requests.
  */
@@ -268,9 +256,12 @@ struct dwc_otg_pcd {
 	struct cfiobject *cfi;
 #endif
 
-    /** psw0523 add for dw_align_buf free work queue */
-    dwc_workq_t *work_align_buf_free;
-    struct list_head free_list;
+#ifdef CONFIG_USB_DWCOTG_DEV_NODE
+    //dev node creation uses the work queue to be able to interface with registering to sysfs
+	struct class *dev_class;
+	dev_t dev_number;
+    dwc_workq_t *dev_node_queue;
+#endif
 };
 
 //FIXME this functions should be static, and this prototypes should be removed

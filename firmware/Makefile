@@ -32,7 +32,6 @@ fw-shipped-$(CONFIG_ADAPTEC_STARFIRE) += adaptec/starfire_rx.bin \
 					 adaptec/starfire_tx.bin
 fw-shipped-$(CONFIG_ARCADYAN_BCM43143) += arcadyan/sdio-g-mfgtest-seqcmds.bin \
 					arcadyan/bcm943143sird_p111.fw \
-					arcadyan/sdio-g-p2p-mchan-idauth-idsup-keepalive-wowlpf-pno-aoe-vsdb-pclose-proptxstatus.bin \
 					arcadyan/43143_Leapfrog_20171201.bin
 fw-shipped-$(CONFIG_ATARI_DSP56K) += dsp56k/bootstrap.bin
 fw-shipped-$(CONFIG_ATM_AMBASSADOR) += atmsar11.fw

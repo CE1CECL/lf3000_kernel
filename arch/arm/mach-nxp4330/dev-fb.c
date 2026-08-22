@@ -380,6 +380,7 @@ static void __init nxp_fb_device_register(void)
  #if defined(CONFIG_NEXELL_SOC_DISP_PRI)
 	switch (get_leapfrog_platform()) {
 	case CABO:
+	case LOWCOST:
 		syncgen_dev_param0.swap_RB = true;
 		pri_fb_plat_data.bgcolor = 0xffffff;//0x3f3f3f;
 		sec_fb_plat_data.bgcolor = 0x3f3f3f;

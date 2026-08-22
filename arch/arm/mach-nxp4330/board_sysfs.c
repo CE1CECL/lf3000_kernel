@@ -136,6 +136,7 @@ bool have_usb_power_option(void)
 		case LF3000_BOARD_LIMA:
 		case LF3000_BOARD_XANADU:
 		case LF3000_BOARD_XANADU_TI:
+		case LF3000_BOARD_LOWCOST:
 			return(1);
 			break;
 
@@ -208,9 +209,14 @@ enum lf2000_leapfrog_platform get_leapfrog_platform(void)
 		case LF3000_BOARD_XANADU_TI:
 			return XANADU;
 
+		case LF3000_BOARD_LOWCOST:
+			return LOWCOST;
+
 		default:
 #if   defined(CONFIG_PLAT_NXP4330_R3K)
 			return RIO;
+#elif defined(CONFIG_PLAT_NXP4330_LOWCOST)
+			return LOWCOST;
 #elif defined(CONFIG_PLAT_NXP4330_CABO)
 			return CABO;
 #elif defined(CONFIG_PLAT_NXP4330_XANADU)
@@ -569,6 +575,7 @@ enum lf2000_lcd_size get_lcd_size(void)
 		case LF2000_BOARD_VALENCIA_FEP_8:
 		case LF2000_BOARD_VALENCIA_CIP:
 		case LF3000_BOARD_CABO:
+		case LF3000_BOARD_LOWCOST:
 			return LCD_480_272;
 
 		case LF2000_BOARD_RIO_KND_800_480:
@@ -609,6 +616,8 @@ enum lf2000_lcd_size get_lcd_size(void)
 			return LCD_480_272;
 #elif defined(CONFIG_PLAT_NXP4330_XANADU)
 			return LCD_1024_600;
+#elif defined(CONFIG_PLAT_NXP4330_LOWCOST)
+			return LCD_480_272;
 #else
 			return LCD_UNKNOWN;
 #endif
@@ -634,6 +643,7 @@ int get_lcd_type(void)
 		case VALENCIA:
 		case CABO:
 		case XANADU:
+		case LOWCOST:
 			return LCD_ILI6480G2;
 		case GLASGOW:
 		case UNKNOWN:
@@ -707,6 +717,8 @@ static ssize_t sysfs_show_platform(struct device *dev,
 		case XANADU:
 			//FIXME: set to XANADU when ready
 			return sprintf(buf, "XANADU\n");
+		case LOWCOST:
+			return sprintf(buf, "LOWCOST\n");
 		case UNKNOWN:
 		default:
 			break;
@@ -727,6 +739,7 @@ static ssize_t sysfs_show_platform_family(struct device *dev,
 		case VALENCIA:
 		case CABO:
 		case XANADU:
+		case LOWCOST:
 			return sprintf(buf, "LPAD\n");
 		case RIO:
 		case LIMA:

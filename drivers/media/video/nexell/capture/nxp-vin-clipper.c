@@ -31,7 +31,7 @@
 #include <mach/soc.h>
 #endif
 
-#ifdef CONFIG_VIDEO_HI253
+#if defined(CONFIG_VIDEO_HI253) || defined(CONFIG_VIDEO_HI25X)
 #include "../../hi253.h"
 #endif
 
@@ -317,7 +317,7 @@ static int _hw_set_input_size(struct nxp_vin_clipper *me)
     struct v4l2_mbus_framefmt *mbus_fmt = &me->format[1];
     struct nxp_vin_platformdata *info = me->platdata;
 
-#ifdef CONFIG_VIDEO_HI253
+#if defined(CONFIG_VIDEO_HI253) || defined(CONFIG_VIDEO_HI25X)
     // Clamp format size to one of native sensor sizes
     hi253_clamp_format_size(mbus_fmt);
 #endif

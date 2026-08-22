@@ -839,14 +839,9 @@ struct dwc_otg_core_if {
 
 	/** Push/pop addresses for endpoints or host channels.*/
 	uint32_t *data_fifo[MAX_EPS_CHANNELS];
-//kook - 20130418
-#if defined(CONFIG_ARCH_NXP3200) || defined(CONFIG_ARCH_NXP4330)
-#define DWC_OTG_DATA_FIFO_OFFSET 0x3000
-#define DWC_OTG_DATA_FIFO_SIZE 0x40
-#else
+
 #define DWC_OTG_DATA_FIFO_OFFSET 0x1000
 #define DWC_OTG_DATA_FIFO_SIZE 0x1000
-#endif
 
 	/** Total RAM for FIFOs (Bytes) */
 	uint16_t total_fifo_size;
@@ -1000,7 +995,9 @@ struct dwc_otg_core_if {
 	uint8_t first_in_nextep_seq;
 
 	/** Frame number while entering to ISR - needed for ISOCs **/
-	uint32_t frame_num; 
+	uint32_t frame_num;
+
+	uint8_t host_flag;
 
 };
 

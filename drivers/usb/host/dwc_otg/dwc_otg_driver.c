@@ -63,11 +63,21 @@
 #include "dwc_otg_core_if.h"
 #include "dwc_otg_pcd_if.h"
 #include "dwc_otg_hcd_if.h"
+#include "dwc_otg_regs.h"
+#include "dwc_otg_cil.h"
+
+/* nexell soc headers */
+#include <mach/platform.h>
 
 #define DWC_DRIVER_VERSION	"3.00a 10-AUG-2012"
 #define DWC_DRIVER_DESC		"HS OTG USB Controller driver"
 
-bool microframe_schedule=true;
+/* NOTE: enabled first branch on 3jul14 */
+#if 0	//defined(CONFIG_ARCH_NXP4330) && defined(CONFIG_USB_VIDEO_CLASS)
+bool microframe_schedule=false;     // Nexell NXP4330
+#else
+bool microframe_schedule=true;      // org
+#endif
 
 static const char dwc_driver_name[] = "dwc_otg";
 
@@ -216,21 +226,21 @@ static struct dwc_otg_driver_module_params dwc_otg_module_params = {
 #else
     .dev_tx_fifo_size = {
         /* dev_tx_fifo_size */
-        0x80,
-        0x80,
-        0x80,
-        0x80,
-        0x80,
-        0x80,
-        0x80,
-        0x80,
-        0x80,
-        0x80,
-        0x80,
-        0x80,
-        0x80,
-        0x80,
-        0x80 
+        0x200,
+        0x200,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1 
             /* 15 */
     },
 #endif
@@ -239,7 +249,7 @@ static struct dwc_otg_driver_module_params dwc_otg_module_params = {
     .rx_thr_length = -1,
     .pti_enable = -1,
     .mpi_enable = -1,
-    .lpm_enable = -1,
+	.lpm_enable = 0,
     .ic_usb_cap = -1,
     .ahb_thr_ratio = -1,
     .power_down = -1,
@@ -251,12 +261,24 @@ static struct dwc_otg_driver_module_params dwc_otg_module_params = {
     .adp_enable = -1,
 };
 
-//Global variable to switch the fiq fix on or off
-bool fiq_fix_enable = false;
-
+#ifndef CONFIG_ARCH_CPU_NEXELL
+//Global variable to switch the fiq fix on or off (declared in bcm2708.c)
+extern bool fiq_fix_enable;
+// Global variable to enable the split transaction fix
+bool fiq_split_enable = true;
 //Global variable to switch the nak holdoff on or off
 bool nak_holdoff_enable = true;
+#else
 
+bool fiq_fix_enable = false;		// false
+bool fiq_split_enable = false;		// false
+bool nak_holdoff_enable = true;
+
+extern void otg_phy_init(void);
+extern void otg_phy_off(void);
+extern void otg_clk_enable(void);
+extern void otg_clk_disable(void);
+#endif	/* CONFIG_ARCH_CPU_NEXELL */
 
 /**
  * This function shows the Driver Version.
@@ -543,25 +565,21 @@ static int set_parameters(dwc_otg_core_if_t * core_if)
             dwc_otg_set_param_reload_ctl(core_if,
                     dwc_otg_module_params.reload_ctl);
     }
-
     if (dwc_otg_module_params.dev_out_nak != -1) {
         retval +=
             dwc_otg_set_param_dev_out_nak(core_if,
                     dwc_otg_module_params.dev_out_nak);
     }
-
     if (dwc_otg_module_params.cont_on_bna != -1) {
         retval +=
             dwc_otg_set_param_cont_on_bna(core_if,
                     dwc_otg_module_params.cont_on_bna);
     }
-
     if (dwc_otg_module_params.ahb_single != -1) {
         retval +=
             dwc_otg_set_param_ahb_single(core_if,
                     dwc_otg_module_params.ahb_single);
     }
-
     if (dwc_otg_module_params.otg_ver != -1) {
         retval +=
             dwc_otg_set_param_otg_ver(core_if,
@@ -573,6 +591,7 @@ static int set_parameters(dwc_otg_core_if_t * core_if)
                     dwc_otg_module_params.
                     adp_enable);
     }
+
     return retval;
 }
 
@@ -601,7 +620,7 @@ static irqreturn_t dwc_otg_common_irq(int irq, void *dev)
  * @param _dev
  */
 #define REM_RETVAL(n) n
-static int dwc_otg_driver_remove(        struct platform_device *_dev )
+static int dwc_otg_driver_remove(struct platform_device *_dev )
 {       
     dwc_otg_device_t *otg_dev = platform_get_drvdata(_dev);
 
@@ -629,15 +648,20 @@ static int dwc_otg_driver_remove(        struct platform_device *_dev )
         return REM_RETVAL(-EINVAL);
     }
 #endif
+
     /*
      * Free the IRQ
      */
     if (otg_dev->common_irq_installed) {
+#ifdef PLATFORM_INTERFACE
         free_irq(platform_get_irq(_dev, 0), otg_dev);
+#else
+		free_irq(_dev->irq, otg_dev);
+#endif
     } else {
         DWC_DEBUGPL(DBG_ANY, "%s: There is no installed irq!\n", __func__);
         return REM_RETVAL(-ENXIO);
-    }  
+    }
 
     if (otg_dev->core_if) {
         dwc_otg_cil_remove(otg_dev->core_if);
@@ -663,6 +687,12 @@ static int dwc_otg_driver_remove(        struct platform_device *_dev )
      * Clear the drvdata pointer.
      */
     platform_set_drvdata(_dev, 0);
+
+#if defined(CONFIG_ARCH_NXP3200) || defined(CONFIG_ARCH_NXP4330)
+    otg_clk_disable();
+    otg_phy_off();
+#endif
+
     return REM_RETVAL(0);
 }
 
@@ -679,63 +709,116 @@ static int dwc_otg_driver_remove(        struct platform_device *_dev )
  */
 // psw0523 add
 #if defined(CONFIG_ARCH_NXP3200) || defined(CONFIG_ARCH_NXP4330)
-extern void otg_phy_init(void);
-extern void otg_clk_enable(void);
-extern void otg_clk_disable(void);
+#define CFG_OTG_MODE_HOST   1
+#define CFG_OTG_MODE_DEVICE 0
+
 extern void set_otg_mode(unsigned int mode, int is_force); 
 extern unsigned int get_otg_mode(void);
 
 #ifdef CONFIG_PM
-static int dwc_otg_driver_remove(struct platform_device *_dev);
+#if 1   //defined(CONFIG_USB_G_ANDROID)
+//static int dwc_otg_driver_remove(struct platform_device *_dev);
 static int dwc_otg_driver_probe(struct platform_device *_dev);
-static struct notifier_block s_pm_notify;
 static struct platform_device *s_pdev = NULL;
+static struct delayed_work      s_otg_reprobe_work;
+static struct workqueue_struct *s_otg_reprobe_wqueue;
 extern void dwc_udc_resume(void);
 extern void dwc_udc_suspend(void);
+#if defined(CONFIG_USB_G_ANDROID)
+extern void nxp_wake_lock_timeout(void);
+#endif
+
+#if 0   //ndef CONFIG_SUSPEND_IDLE
+static struct notifier_block s_pm_notify;
 int dwc_otg_hcd_pm_notify(struct notifier_block *notifier_block,
         unsigned long mode, void *unused)
 {
+    PM_DBGOUT("++ %s: %d mode\n", __func__, mode);
 
     switch(mode) {
     case PM_SUSPEND_PREPARE:
+        PM_DBGOUT("%s: prepare suspend\n", __func__);
+
         if (s_pdev) {
-            printk("%s: prepare suspend\n", __func__);
-            dwc_udc_suspend();
-            dwc_otg_driver_remove(s_pdev);
+            struct platform_device * _dev = s_pdev;
+            dwc_otg_device_t *otg_dev;
+
+            otg_dev = platform_get_drvdata(s_pdev);
+
+             /*
+             * Disable the global interrupt until all the interrupt
+             * handlers are installed.
+             */
+            dev_dbg(&_dev->dev, "Calling disable_global_interrupts\n");
+            dwc_otg_disable_global_interrupts(otg_dev->core_if);
         }
         break;
+
     case PM_POST_SUSPEND:
+        PM_DBGOUT("%s: post suspend\n", __func__);
+
         if (s_pdev) {
-            unsigned int otg_mode = get_otg_mode();
-            printk("%s: post suspend\n", __func__);
-            printk("otg mode: %d\n", otg_mode);
-            dwc_otg_driver_probe(s_pdev);
-            dwc_udc_resume();
-            set_otg_mode(otg_mode, 1);
+            struct platform_device * _dev = s_pdev;
+            dwc_otg_device_t *otg_dev;
+
+            dev_dbg(&_dev->dev, "Calling enable_global_interrupts\n");
+            dwc_otg_enable_global_interrupts(otg_dev->core_if);
+            dev_dbg(&_dev->dev, "Done\n");
         }
         break;
     }
 
     return 0;
 }
+#endif  /* CONFIG_SUSPEND_IDLE */
+#endif  /* CONFIG_USB_G_ANDROID */
 
-static int dwc_otg_driver_suspend(struct platform_device *dev, pm_message_t state)
+static int dwc_otg_driver_suspend(struct platform_device *_dev, pm_message_t state)
 {
-    printk("%s entered\n", __func__);
+    PM_DBGOUT("+%s\n", __func__);
+
+    if (s_pdev) {
+        dwc_otg_device_t *otg_dev = platform_get_drvdata(s_pdev);
+        dwc_otg_core_if_t * core_if = otg_dev->core_if;
+
+        /* Disable all interrupts */
+        DWC_MODIFY_REG32(&core_if->core_global_regs->gahbcfg, 1, 0);
+        DWC_WRITE_REG32(&core_if->core_global_regs->gintmsk, 0);
+
+        otg_clk_disable();
+        otg_phy_off();
+    }
+
+    PM_DBGOUT("-%s\n", __func__);
+
     return 0;
 }
 
-static int dwc_otg_driver_resume(struct platform_device *dev)
+static int dwc_otg_driver_resume(struct platform_device *_dev)
 {
-    printk("%s entered\n", __func__);
-#if 0
-    set_otg_mode(CFG_OTG_MODE_HOST);
-    dwc_otg_driver_probe(dev);
+    PM_DBGOUT("+%s\n", __func__);
+
+    if (s_pdev) {
+        otg_clk_enable();
+        otg_phy_init();
+        mdelay(10);
+
+        dwc_udc_suspend();
+        dwc_otg_driver_remove(s_pdev);
+
+        dwc_otg_driver_probe(s_pdev);
+        dwc_udc_resume();
+
+#if defined(CONFIG_USB_G_ANDROID)
+        nxp_wake_lock_timeout();
 #endif
+    }
+
+    PM_DBGOUT("-%s\n", __func__);
+
     return 0;
 }
 #endif /* CONFIG_PM */
-
 #endif /* CONFIG_ARCH_NXP3200 */
 
 static int dwc_otg_driver_probe(
@@ -767,6 +850,7 @@ static int dwc_otg_driver_probe(
     DWC_DEBUGPL(DBG_ANY,"Platform resource: start=%08x, len=%08x\n",
             _dev->resource->start,
             _dev->resource->end - _dev->resource->start + 1);
+
     if (!request_mem_region(_dev->resource[0].start,
                 _dev->resource[0].end - _dev->resource[0].start + 1,
                 "dwc_otg")) {
@@ -870,8 +954,8 @@ static int dwc_otg_driver_probe(
     }
 
 #ifndef IRQF_TRIGGER_LOW
-	dev_dbg(&_dev->dev, "Calling set_irq_type\n");
-	set_irq_type(devirq,
+    dev_dbg(&_dev->dev, "Calling set_irq_type\n");
+    set_irq_type(devirq,
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,30))
                      IRQT_LOW
 #else
@@ -880,7 +964,30 @@ static int dwc_otg_driver_probe(
                      );
 #endif /*IRQF_TRIGGER_LOW*/
 
-    /*
+#ifdef CONFIG_NXP4330_LEAPFROG	/* Change from HS Jung 8/8/14 */
+	// check mode whether host or device on boot.
+    dwc_otg_set_param_dma_enable(dwc_otg_device->core_if,1);
+    if(!dwc_otg_is_host_mode(dwc_otg_device->core_if))
+		dwc_otg_set_param_dma_desc_enable(dwc_otg_device->core_if,0);
+#endif
+
+#ifdef CONFIG_NXP4330_LEAPFROG
+#ifdef CONFIG_PLAT_NXP4330_GLASGOW_ALPHA
+	retval = gpio_request(USB_POWER_FLT_L, "USB_POWER_FLT_L");
+	if (retval < 0)
+	{
+        dev_err(&_dev->dev, "Failed to request GPIO:%d, ERRNO:%d\n", USB_POWER_FLT_L, retval);
+        goto fail;
+    }
+	gpio_direction_input(USB_POWER_FLT_L);
+#endif
+	// check mode whether host or device on boot.
+	dwc_otg_set_param_dma_enable(dwc_otg_device->core_if,1);
+    if(!dwc_otg_is_host_mode(dwc_otg_device->core_if))
+		dwc_otg_set_param_dma_desc_enable(dwc_otg_device->core_if,0);
+#endif
+
+	/*
      * Initialize the DWC_otg core.
      */
     dev_dbg(&_dev->dev, "Calling dwc_otg_core_init\n");
@@ -896,7 +1003,7 @@ static int dwc_otg_driver_probe(
         DWC_ERROR("pcd_init failed\n");
         dwc_otg_device->pcd = NULL;
         goto fail;
-    }	
+    }
 #endif
 #ifndef DWC_DEVICE_ONLY
     /*
@@ -928,11 +1035,17 @@ static int dwc_otg_driver_probe(
 
     // psw0523 add for pm
 #if defined(CONFIG_PM) && defined(CONFIG_ARCH_NXP4330)
-    s_pdev = _dev;
+    if (s_pdev == NULL)
+        s_pdev = _dev;
+
+#if 0   //ndef CONFIG_SUSPEND_IDLE
     if (!s_pm_notify.notifier_call) {
         s_pm_notify.notifier_call = dwc_otg_hcd_pm_notify;
         register_pm_notifier(&s_pm_notify);
     }
+#endif  /* CONFIG_SUSPEND_IDLE */
+
+    device_enable_async_suspend(&_dev->dev);
 #endif
 
     return 0;
@@ -961,7 +1074,7 @@ static struct platform_device_id platform_ids[] = {
     // psw0523 add
 #if defined(CONFIG_ARCH_NXP3200) || defined(CONFIG_ARCH_NXP4330)
     {
-        .name = "dwc3-gadget",
+        .name = "dwc_otg",
         .driver_data = (kernel_ulong_t) 0xdeadbeef,
     },
 #endif
@@ -974,7 +1087,6 @@ static struct platform_driver dwc_otg_driver = {
         .name = (char *)dwc_driver_name,
     },
     .id_table = platform_ids,
-
     .probe = dwc_otg_driver_probe,
     .remove = dwc_otg_driver_remove,
 #ifdef CONFIG_PM
@@ -999,8 +1111,16 @@ static int __init dwc_otg_driver_init(void)
     int retval = 0;
     int error;
     struct device_driver *drv;
-    printk(KERN_INFO "%s: version %s (%s bus)\n", dwc_driver_name,
-            DWC_DRIVER_VERSION, "platform");
+
+#if defined(CONFIG_ARCH_NXP3200) || defined(CONFIG_ARCH_NXP4330)
+#ifdef CONFIG_PM
+    s_pdev = NULL;
+#endif
+#endif
+
+	printk(KERN_INFO "%s: version %s (%s bus)\n", dwc_driver_name,
+			DWC_DRIVER_VERSION, "platform");
+
     retval = platform_driver_register(&dwc_otg_driver);
     drv = &dwc_otg_driver.driver;
     if (retval < 0) {
@@ -1031,6 +1151,12 @@ static void __exit dwc_otg_driver_cleanup(void)
     driver_remove_file(&dwc_otg_driver.driver, &driver_attr_debuglevel);
     driver_remove_file(&dwc_otg_driver.driver, &driver_attr_version);
     platform_driver_unregister(&dwc_otg_driver);
+
+#if defined(CONFIG_ARCH_NXP3200) || defined(CONFIG_ARCH_NXP4330)
+#ifdef CONFIG_PM
+    s_pdev = NULL;
+#endif
+#endif
 
     printk(KERN_INFO "%s module removed\n", dwc_driver_name);
 }
@@ -1277,7 +1403,6 @@ module_param_named(otg_ver, dwc_otg_module_params.otg_ver, int, 0444);
 MODULE_PARM_DESC(otg_ver, "OTG revision supported 0=OTG 1.3 1=OTG 2.0");
 module_param(microframe_schedule, bool, 0444);
 MODULE_PARM_DESC(microframe_schedule, "Enable the microframe scheduler");
-
 
 module_param(fiq_fix_enable, bool, 0444);
 MODULE_PARM_DESC(fiq_fix_enable, "Enable the fiq fix");

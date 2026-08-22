@@ -1348,7 +1348,7 @@ static int camera_power_enable(bool on)
     if (on) {
     	printk("%s: Front Camera ON\n", __func__);
         /* reset signal */
-    	gpio_set_value(FRONT_CAM_ENABLE_L, 0);
+      	gpio_direction_output(FRONT_CAM_ENABLE_L,0); //set cam_enable gpio as output
         msleep(10);
         gpio_set_value(FRONT_CAM_RESET_L, 1);
         msleep(10);
@@ -1356,7 +1356,7 @@ static int camera_power_enable(bool on)
     	printk("%s: Front Camera OFF\n", __func__);
         gpio_set_value(FRONT_CAM_RESET_L, 0);
         msleep(10);
-    	gpio_set_value(FRONT_CAM_ENABLE_L, 1);
+        gpio_direction_input(FRONT_CAM_ENABLE_L); /*set cam_enable gpio as input, makes pin high due to hardware pull ups. */
         msleep(10);
     }
     enabled = on;
@@ -1379,7 +1379,7 @@ static int camera_power_enable2(bool on)
     if (on) {
     	printk("%s: Rear Camera ON\n", __func__);
         /* reset signal */
-    	gpio_set_value(REAR_CAM_ENABLE_L, 0);
+      	gpio_direction_output(REAR_CAM_ENABLE_L,0); //set cam_enable gpio as output
         msleep(10);
         gpio_set_value(REAR_CAM_RESET_L, 1);
         msleep(10);
@@ -1387,7 +1387,7 @@ static int camera_power_enable2(bool on)
     	printk("%s: Rear Camera OFF\n", __func__);
         gpio_set_value(REAR_CAM_RESET_L, 0);
         msleep(10);
-    	gpio_set_value(REAR_CAM_ENABLE_L, 1);
+        gpio_direction_input(REAR_CAM_ENABLE_L); /*set cam_enable gpio as input, makes pin high due to hardware pull ups. */
         msleep(10);
     }
     enabled = on;
@@ -1458,6 +1458,7 @@ static void vin_setup_io2(int module, bool on)
     printk("%s: module:%d  on:%d\n", __func__, module, on);
 }
 
+#ifdef CONFIG_VIDEO_HI253
 static struct i2c_board_info hi253_i2c_boardinfo[] = {
     {
         I2C_BOARD_INFO("HI253", 0x40>>1),
@@ -1474,6 +1475,26 @@ static struct nxp_v4l2_i2c_board_info sensor[] = {
         .i2c_adapter_id = 0,
     },
 };
+#endif
+
+#ifdef CONFIG_VIDEO_HI25X
+static struct i2c_board_info hi253_i2c_boardinfo[] = {
+    {
+        I2C_BOARD_INFO("HI25X", 0x40>>1),
+    },
+};
+
+static struct nxp_v4l2_i2c_board_info sensor[] = {
+    {
+        .board_info = &hi253_i2c_boardinfo[0],
+        .i2c_adapter_id = 1,
+    },
+    {
+        .board_info = &hi253_i2c_boardinfo[0],
+        .i2c_adapter_id = 0,
+    },
+};
+#endif
 
 static struct nxp_capture_platformdata capture_plat_data[] = {
     {
@@ -1989,6 +2010,20 @@ void lf3000_poweroff(void)
 #error Shutdown not defined
 #endif
 
+#elif defined(CONFIG_POWER_DOWN_SRC_DEP)
+
+#if defined(CONFIG_SOC_LFP100)
+        if (lfp100_is_ac()) {
+            printk(KERN_ALERT "Power Down Standby.\n");
+            lfp100_set_power_standby();
+        } else {
+            printk(KERN_ALERT "Power Down Off.\n");
+            lfp100_set_power_off();
+        }
+#else
+#error Shutdown not defined
+#endif
+
 #else
 #error Expected a CONFIG_POWER_DOWN_xxx configuration
 #endif
@@ -2198,6 +2233,10 @@ void __init nxp_board_devices_register(void)
 
 #if defined(CONFIG_V4L2_NEXELL) || defined(CONFIG_V4L2_NEXELL_MODULE)
     printk("plat: add device nxp-v4l2\n");
+	camera_set_clock(24000000);
+	camera_power_enable(1);
+	camera_power_enable2(1);
+	printk("plat: set camera clk and power\n");
     platform_device_register(&nxp_v4l2_dev);
 #endif
 

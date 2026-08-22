@@ -1,7 +1,24 @@
 #ifndef _LF1000_POWER_H_
 #define _LF1000_POWER_H_
 
-#if defined(CONFIG_PLAT_NXP3200_RIO) || defined(CONFIG_PLAT_NXP4330)
+#if defined (CONFIG_PLAT_NXP4330_LOWCOST)
+/* default values */
+/* SP 04-16-13: If you are changing low battery threshold here, 
+ * make sure you also change it in these two files to maintain it 
+ * across boot, kernel and battery voltage logging.
+ * Battery logger - LinuxDist_LF2000/packages/optimization/bat-logger.sh
+ * Boot - nxp3200_bsp/bootloader/u-boot-2010.06/board/nxp3200/common/board.c
+ */
+#define MAX_BATTERY_MV	6600		/* max expected battery value	*/
+#define LOW_BATTERY_MV	4000		/* low battery			*/
+#define LOW_BATTERY_REPEAT_MV 25	/* repeat every 25mv drop	*/
+
+/* Hysteresis low to normal Battery */
+#define NORMAL_BATTERY_MV   (LOW_BATTERY_MV + 200)
+#define CRITICAL_BATTERY_MV 3650	/* critical low battery		*/
+#define BATTERY_DOWN_MV 3550	/* force shut down the unit	*/
+
+#elif defined(CONFIG_PLAT_NXP3200_RIO) || defined(CONFIG_PLAT_NXP4330)
 /* default values */
 /* SP 04-16-13: If you are changing low battery threshold here, 
  * make sure you also change it in these two files to maintain it 
@@ -15,6 +32,8 @@
 
 /* Hysteresis low to normal Battery */
 #define NORMAL_BATTERY_MV   (LOW_BATTERY_MV + 200)
+#define CRITICAL_BATTERY_MV 0	/* critical low battery		*/
+#define BATTERY_DOWN_MV 0	/* force shut down the unit	*/
 
 #else
 /* default values */
@@ -24,6 +43,8 @@
 
 /* Hysteresis low to normal Battery */
 #define NORMAL_BATTERY_MV   (LOW_BATTERY_MV + 400)
+#define CRITICAL_BATTERY_MV 0	/* critical low battery		*/
+#define BATTERY_DOWN_MV 0	/* force shut down the unit	*/
 
 #endif // Rio or non-Rio
 
@@ -32,7 +53,8 @@
  * allowing play until you die.  Can still adjust level via
  * /sys/devices/platform/lf1000-power/critical_battery_mv interface
  */
-#define CRITICAL_BATTERY_MV 0	/* critical low battery		*/
+//#define CRITICAL_BATTERY_MV 0	/* critical low battery		*/
+//#define BATTERY_DOWN_MV 0	/* force shut down the unit	*/
 
 enum lf1000_power_status {
 	LF1000_UNKNOWN 		= 0,
@@ -42,6 +64,7 @@ enum lf1000_power_status {
 	CRITICAL_BATTERY	= 4,
 	NIMH			= 5,	/* on NIMH battery power   */
 	NIMH_CHARGER		= 6,	/* in NiMH battery charger */
+	BATTERY_DOWN		=7,
 };
 
 enum lf1000_power_source {

@@ -77,25 +77,6 @@ static dwc_otg_pcd_ep_t *get_ep_from_handle(dwc_otg_pcd_t * pcd, void *handle)
 }
 
 /**
- * psw0523 add for free align buf
- */
-static void free_align_buf(void *p)
-{
-    dwc_otg_pcd_t *pcd = p;
-    struct list_head *plist = &pcd->free_list;
-    struct free_dw_align_buf *buf = NULL;
-
-    while (!list_empty(plist)) {
-        buf = list_first_entry(plist, struct free_dw_align_buf, list);
-        if (buf) {
-            DWC_DMA_FREE(buf->length, buf->buf, buf->dma);
-            list_del(&buf->list);
-            kfree(buf);
-        }
-    }
-}
-
-/**
  * This function completes a request.  It call's the request call back.
  */
 void dwc_otg_request_done(dwc_otg_pcd_ep_t * ep, dwc_otg_pcd_request_t * req,
@@ -103,36 +84,27 @@ void dwc_otg_request_done(dwc_otg_pcd_ep_t * ep, dwc_otg_pcd_request_t * req,
 {
 	unsigned stopped = ep->stopped;
 
-	DWC_DEBUGPL(DBG_PCDV, "%s(ep %p req %p)\n", __func__, ep, req);
+	DWC_DEBUGPL(DBG_PCD, "%s(ep %p req (%p - %p) %p:%d to %x, align buf %p (%s)\n",
+		__func__, ep, req, req->priv, req->buf, req->length, req->dma,
+		req->dw_align_buf, ep->dwc_ep.is_in?"in":"out");
+
 	DWC_CIRCLEQ_REMOVE_INIT(&ep->queue, req, queue_entry);
 
 	/* don't modify queue heads during completion callback */
 	ep->stopped = 1;
 	/* spin_unlock/spin_lock now done in fops->complete() */
+#if defined(CONFIG_ARCH_CPU_NEXELL)
+	ep->pcd->fops->complete(ep->pcd, ep->priv, req, status,
+				req->actual);
+#else
 	ep->pcd->fops->complete(ep->pcd, ep->priv, req->priv, status,
 				req->actual);
-
+#endif
 	if (ep->pcd->request_pending > 0) {
 		--ep->pcd->request_pending;
 	}
 
 	ep->stopped = stopped;
-
-    if (req->dw_align_buf) {
-        // psw0523 fix
-#if 0
-        DWC_DMA_FREE(req->length, req->dw_align_buf,
-                req->dw_align_buf_dma);
-#else
-        struct free_dw_align_buf *free_buf = kzalloc(sizeof(struct free_dw_align_buf), GFP_KERNEL);
-        free_buf->buf = req->dw_align_buf;
-        free_buf->dma = req->dw_align_buf_dma;
-        free_buf->length = req->length;
-        list_add_tail(&free_buf->list, &ep->pcd->free_list);
-        DWC_WORKQ_SCHEDULE(ep->pcd->work_align_buf_free, free_align_buf, ep->pcd, "free dwc align buf");
-#endif
-    }
-    // end psw0523
 	DWC_FREE(req);
 }
 
@@ -152,14 +124,100 @@ void dwc_otg_request_nuke(dwc_otg_pcd_ep_t * ep)
 	}
 }
 
+#ifdef CONFIG_USB_DWCOTG_DEV_NODE
+//for dev-node creation use, do not call during interupt as the class_create function needs to be able to sleep.
+#define device_name "fakeusb"
+static void dwc_otg_pcd_devnode_create(void *data)
+{
+	dwc_otg_pcd_t *pcd = (dwc_otg_pcd_t *) data;
+	//DWC_PRINTF("%s: start\n",__FUNCTION__);
+	//few error checks just to be sure...
+	if(alloc_chrdev_region(&pcd->dev_number,0,1,device_name)!=0)
+	{
+		DWC_PRINTF("%s: ERROR: Unable to create dev region\n",__FUNCTION__);
+		return;
+	}
+	if((pcd->dev_class = class_create(THIS_MODULE,device_name))==NULL)
+	{
+		DWC_PRINTF("%s: ERROR: Unable to create class\n",__FUNCTION__);
+		return;
+	}
+	if(!pcd->dev_class) { DWC_PRINTF("%s: ERROR: dev_class undefined.\n",__FUNCTION__); return; }
+	if(pcd->dev_number==-1){ DWC_PRINTF("%s: ERROR: dev_number has not been set.\n",__FUNCTION__); return; }
+
+	//device_register
+	if(device_create(pcd->dev_class, NULL, pcd->dev_number, NULL, device_name)==NULL)
+	{
+		DWC_PRINTF("%s: ERROR: Unable to create device.\n",__FUNCTION__);
+		return;
+	}
+#ifdef DEBUG
+	DWC_PRINTF("%s: dev node created.\n",__FUNCTION__);
+#endif
+	return;
+}
+static void dwc_otg_pcd_devnode_destroy(void *data)
+{
+	dwc_otg_pcd_t *pcd = (dwc_otg_pcd_t *) data;
+	//few error checks just to be sure...
+	if(!pcd->dev_class) { DWC_PRINTF("%s: ERROR: dev_class undefined.\n",__FUNCTION__); return; }
+	if(pcd->dev_number==-1){ DWC_PRINTF("%s: ERROR: dev_number has not been set.\n",__FUNCTION__); return; }
+
+	device_destroy(pcd->dev_class, pcd->dev_number);
+	//dwc_otg_pcd_devnode_destroy();
+	class_unregister(pcd->dev_class);
+	class_destroy(pcd->dev_class);
+	unregister_chrdev_region(pcd->dev_number,1);
+#ifdef DEBUG
+	DWC_PRINTF("%s: dev node destroyed.\n",__FUNCTION__);
+#endif
+}
+#endif
+
 static void dwc_otg_pcd_update_connected_state(unsigned long data)
 {
+	static int last_state = 0;
+	int new_state;
 	dwc_otg_pcd_t* pcd;
 	pcd = (struct dwc_otg_pcd_t*)data;
 
-	input_report_switch(pcd->input, SW_LID, pcd->conn_state);
-	input_sync(pcd->input);
+	new_state = pcd->conn_state ? 1 : 0;
+#ifdef DEBUG
+	DWC_PRINTF("%s: conn_state = %i, last_state = %i\n",
+			__func__, new_state, last_state);
+#endif
+	if (new_state != last_state) {
+		input_report_switch(pcd->input, SW_LID, pcd->conn_state);
+		input_sync(pcd->input);
+		last_state = new_state;
+#ifdef CONFIG_USB_DWCOTG_DEV_NODE
+		//register a fake-ish device node
+		if(new_state) {
+			DWC_WORKQ_SCHEDULE(pcd->dev_node_queue,dwc_otg_pcd_devnode_create,pcd,"DEV_NODE_CREATE");
+		}
+		else {
+			DWC_WORKQ_SCHEDULE(pcd->dev_node_queue,dwc_otg_pcd_devnode_destroy,pcd,"DEV_NODE_DESTROY");
+		}
+#endif
+	}
 }
+
+#ifdef CONFIG_TC7734_PMIC
+/*
+ * LF3000 sometimes misses VBUS disconnect message.
+ * Toshiba TC7734 PMIC makes a reminder call here on USB VBUS disconnect
+ */
+
+#define	TC7734_USB_DISCONNECT	0
+struct input_dev *tc7734_input = NULL;
+
+void dwc_otg_pcd_update_disconnected_state_tc7734(void)
+{
+	input_report_switch(tc7734_input, SW_LID, TC7734_USB_DISCONNECT);
+	input_sync(tc7734_input);
+}
+EXPORT_SYMBOL(dwc_otg_pcd_update_disconnected_state_tc7734);
+#endif
 
 void dwc_otg_pcd_start(dwc_otg_pcd_t * pcd,
 		       const struct dwc_otg_pcd_function_ops *fops)
@@ -1170,8 +1228,8 @@ dwc_otg_pcd_t *dwc_otg_pcd_init(dwc_otg_core_if_t * core_if)
 	}
 
 	pcd->lock = DWC_SPINLOCK_ALLOC();
-        DWC_DEBUGPL(DBG_HCDV, "Init of PCD %p given core_if %p\n",
-                    pcd, core_if);//GRAYG
+	DWC_DEBUGPL(DBG_HCDV, "Init of PCD %p given core_if %p\n",
+			pcd, core_if);//GRAYG
 	if (!pcd->lock) {
 		DWC_ERROR("Could not allocate lock for pcd");
 		DWC_FREE(pcd);
@@ -1350,40 +1408,90 @@ dwc_otg_pcd_t *dwc_otg_pcd_init(dwc_otg_core_if_t * core_if)
 
 	i = input_register_device(pcd->input);
 	if(i) {
-		DWC_ERROR("can't register dev for vbus key hack");
-		DWC_FREE(pcd->setup_pkt);
-		DWC_FREE(pcd);
-		return NULL;
+		 DWC_ERROR("can't register dev for vbus key hack");
+		 DWC_FREE(pcd->setup_pkt);
+		 DWC_FREE(pcd);
+		 return NULL;
 	}
+
+#ifdef CONFIG_TC7734_PMIC
+	tc7734_input = pcd->input;	/* save for TC7734 USB Disconnect Msg */
+#endif
 
 	/* Initialize connection state timer */
 	setup_timer( &(pcd->conn_state_timer), dwc_otg_pcd_update_connected_state,
-			(unsigned long)pcd );
+		(unsigned long)pcd );
 
-    // psw0523 debugging
-    //dwc_otg_dump_dev_registers(core_if);
-    // end psw0523
+#ifdef CONFIG_USB_DWCOTG_DEV_NODE
+	pcd->dev_class=NULL;
+	pcd->dev_number=0;
+	pcd->dev_node_queue=DWC_WORKQ_ALLOC("dev_node_queue");
+#endif
 
-    /* psw0523 add for align_buf free work */
-    pcd->work_align_buf_free = DWC_WORKQ_ALLOC("dwc_otg_free_alignbuf");
-    INIT_LIST_HEAD(&pcd->free_list);
+// psw0523 debugging
+	//dwc_otg_dump_dev_registers(core_if);
+
+	/* psw0523 add for align_buf free work */
+#if (USE_FREE_LIST == 1)
+	pcd->work_align_buf_free = DWC_WORKQ_ALLOC("dwc_otg_free_alignbuf");
+	INIT_LIST_HEAD(&pcd->free_list);
+#endif
+// end psw0523
+
+#ifdef CONFIG_NXP4330_LEAPFROG	/* Prevent early connection */
+		/* without this call, there are often problems when the 
+		 * mass storage class driver is loaded later, and the 
+		 * controller is re-initialized.
+		 */
+	dwc_otg_pcd_soft_disconnect(pcd);
+#endif	/* CONFIG_NXP4330_LEAPFROG */
 
 	return pcd;
 #ifdef DWC_UTE_CFI
 fail:
 #endif
+
+#if 0
 	if (pcd->setup_pkt)
 		DWC_FREE(pcd->setup_pkt);
 	if (pcd->status_buf)
 		DWC_FREE(pcd->status_buf);
+#else
+	if (GET_CORE_IF(pcd)->dma_enable) {
+		DWC_DMA_FREE(sizeof(*pcd->setup_pkt) * 5,
+				pcd->setup_pkt,
+				pcd->setup_pkt_dma_handle);
+		DWC_DMA_FREE(sizeof(uint16_t),
+				pcd->status_buf,
+				pcd->status_buf_dma_handle);
+		if (GET_CORE_IF(pcd)->dma_desc_enable) {
+			dwc_otg_ep_free_desc_chain(
+							dev_if->setup_desc_addr[0],
+							dev_if->dma_setup_desc_addr[0], 1);
+			dwc_otg_ep_free_desc_chain(
+							dev_if->setup_desc_addr[1],
+							dev_if->dma_setup_desc_addr[1], 1);
+			dwc_otg_ep_free_desc_chain(
+							dev_if->in_desc_addr,
+							dev_if->dma_in_desc_addr, 1);
+			dwc_otg_ep_free_desc_chain(
+							dev_if->out_desc_addr,
+							dev_if->dma_out_desc_addr, 1);
+		}
+	} else {
+		DWC_FREE(pcd->setup_pkt);
+		DWC_FREE(pcd->status_buf);
+	}
+#endif
+
 #ifdef DWC_UTE_CFI
 	if (pcd->cfi)
 		DWC_FREE(pcd->cfi);
 #endif
 	if (pcd)
 		DWC_FREE(pcd);
-	return NULL;
 
+	return NULL;
 }
 
 /**
@@ -1393,6 +1501,7 @@ void dwc_otg_pcd_remove(dwc_otg_pcd_t * pcd)
 {
 	dwc_otg_dev_if_t *dev_if = GET_CORE_IF(pcd)->dev_if;
 	int i;
+
 	if (pcd->core_if->core_params->dev_out_nak) {
 		for (i = 0; i < MAX_EPS_CHANNELS; i++) {
 			DWC_TIMER_CANCEL(pcd->core_if->ep_xfer_timer[i]);
@@ -1401,22 +1510,25 @@ void dwc_otg_pcd_remove(dwc_otg_pcd_t * pcd)
 	}
 
 	if (GET_CORE_IF(pcd)->dma_enable) {
-		DWC_DMA_FREE(sizeof(*pcd->setup_pkt) * 5, pcd->setup_pkt,
-			     pcd->setup_pkt_dma_handle);
-		DWC_DMA_FREE(sizeof(uint16_t), pcd->status_buf,
-			     pcd->status_buf_dma_handle);
+		DWC_DMA_FREE(sizeof(*pcd->setup_pkt) * 5,
+				pcd->setup_pkt,
+				pcd->setup_pkt_dma_handle);
+		DWC_DMA_FREE(sizeof(uint16_t),
+				pcd->status_buf,
+				pcd->status_buf_dma_handle);
 		if (GET_CORE_IF(pcd)->dma_desc_enable) {
-			dwc_otg_ep_free_desc_chain(dev_if->setup_desc_addr[0],
-						   dev_if->dma_setup_desc_addr
-						   [0], 1);
-			dwc_otg_ep_free_desc_chain(dev_if->setup_desc_addr[1],
-						   dev_if->dma_setup_desc_addr
-						   [1], 1);
-			dwc_otg_ep_free_desc_chain(dev_if->in_desc_addr,
-						   dev_if->dma_in_desc_addr, 1);
-			dwc_otg_ep_free_desc_chain(dev_if->out_desc_addr,
-						   dev_if->dma_out_desc_addr,
-						   1);
+			dwc_otg_ep_free_desc_chain(
+							dev_if->setup_desc_addr[0],
+							dev_if->dma_setup_desc_addr[0], 1);
+			dwc_otg_ep_free_desc_chain(
+							dev_if->setup_desc_addr[1],
+							dev_if->dma_setup_desc_addr[1], 1);
+			dwc_otg_ep_free_desc_chain(
+							dev_if->in_desc_addr,
+							dev_if->dma_in_desc_addr, 1);
+			dwc_otg_ep_free_desc_chain(
+							dev_if->out_desc_addr,
+							dev_if->dma_out_desc_addr, 1);
 		}
 	} else {
 		DWC_FREE(pcd->setup_pkt);
@@ -1428,6 +1540,9 @@ void dwc_otg_pcd_remove(dwc_otg_pcd_t * pcd)
 
 	DWC_TASK_FREE(pcd->start_xfer_tasklet);
 	DWC_TASK_FREE(pcd->test_mode_tasklet);
+#ifdef CONFIG_USB_DWCOTG_DEV_NODE
+	DWC_WORKQ_FREE(pcd->dev_node_queue);
+#endif
 	if (pcd->core_if->core_params->dev_out_nak) {
 		for (i = 0; i < MAX_EPS_CHANNELS; i++) {
 			if (pcd->core_if->ep_xfer_timer[i]) {
@@ -1444,9 +1559,6 @@ void dwc_otg_pcd_remove(dwc_otg_pcd_t * pcd)
 		pcd->cfi->ops.release(pcd->cfi);
 	}
 #endif
-
-    /* psw0523 add for align buf free work */
-    DWC_WORKQ_FREE(pcd->work_align_buf_free);
 
 	DWC_FREE(pcd);
 }
@@ -1768,14 +1880,29 @@ int dwc_otg_pcd_ep_disable(dwc_otg_pcd_t * pcd, void *ep_handle)
 	/* Free DMA Descriptors */
 	if (GET_CORE_IF(pcd)->dma_desc_enable) {
 		if (ep->dwc_ep.type != UE_ISOCHRONOUS) {
+#ifdef CONFIG_ARCH_CPU_NEXELL
+			int irqoff = irqs_disabled();
+#endif
 			desc_addr = ep->dwc_ep.desc_addr;
 			dma_desc_addr = ep->dwc_ep.dma_desc_addr;
 
 			/* Cannot call dma_free_coherent() with IRQs disabled */
 			DWC_SPINUNLOCK_IRQRESTORE(pcd->lock, flags);
+#ifdef CONFIG_ARCH_CPU_NEXELL
+			if (irqoff) {
+				DWC_WARN(" irqs disabled, force irqs enable  (in interrupt %s)...\n",
+					in_interrupt() ? "O":"X");
+				local_irq_enable();
+			}
+#endif
 			dwc_otg_ep_free_desc_chain(desc_addr, dma_desc_addr,
 						   MAX_DMA_DESC_CNT);
-
+#ifdef CONFIG_ARCH_CPU_NEXELL
+			if (irqoff) {
+				DWC_WARN(" restore irqs disabled status ...\n");
+				local_irq_disable();
+			}
+#endif
 			goto out_unlocked;
 		}
 	}
@@ -2208,22 +2335,25 @@ int dwc_otg_pcd_ep_queue(dwc_otg_pcd_t * pcd, void *ep_handle,
 	req->sent_zlp = zero;
 	req->priv = req_handle;
 	req->dw_align_buf = NULL;
-	if ((dma_buf & 0x3) && GET_CORE_IF(pcd)->dma_enable
-			&& !GET_CORE_IF(pcd)->dma_desc_enable) {
-#if 0
-// org
-		req->dw_align_buf = DWC_DMA_ALLOC(buflen,
-				 &req->dw_align_buf_dma);
+
+#if defined(CONFIG_ARCH_CPU_NEXELL)
+	if (buflen &&
+		(((unsigned int)buf & 0x3) || (dma_buf & 0x3)) && GET_CORE_IF(pcd)->dma_enable
 #else
-//kook - [20130415] fixed on 3200 - JellyBean aosp-4.2.2_r1
+	if ((dma_buf & 0x3) && GET_CORE_IF(pcd)->dma_enable
+#endif
+			&& !GET_CORE_IF(pcd)->dma_desc_enable) {
 		req->dw_align_buf = DWC_DMA_ALLOC_ATOMIC(buflen,
 				 &req->dw_align_buf_dma);
-#endif
+		DWC_DEBUGPL(DBG_PCD, "%s: DWC_DMA_ALLOC_ATOMIC (req %p) %p:%d dma %x (align %p:%x)\n",
+        	__func__, req_handle, req->buf, req->length, req->dma,
+        	req->dw_align_buf, req->dw_align_buf_dma);
+	}
 
-        // psw0523 debugging
-        //printk("====> alloc align buf(%p), req(%p)\n", req->dw_align_buf, req);
-    }
 	DWC_SPINLOCK_IRQSAVE(pcd->lock, &flags);
+
+	DWC_DEBUGPL(DBG_PCD, "%s:  (req %p - %p) %p:%d to %x, align buf %p\n",
+		__func__, req, req_handle, req->buf, req->length, req->dma, req->dw_align_buf);
 
 	/*
 	 * After adding request to the queue for IN ISOC wait for In Token Received
@@ -2342,7 +2472,7 @@ int dwc_otg_pcd_ep_queue(dwc_otg_pcd_t * pcd, void *ep_handle,
 				} else {
 					ep->dwc_ep.dma_addr = dma_buf;
 					ep->dwc_ep.start_xfer_buff = buf;
-                                        ep->dwc_ep.xfer_buff = buf;
+					ep->dwc_ep.xfer_buff = buf;
 				}
 				ep->dwc_ep.xfer_len = 0;
 				ep->dwc_ep.xfer_count = 0;
@@ -2354,6 +2484,7 @@ int dwc_otg_pcd_ep_queue(dwc_otg_pcd_t * pcd, void *ep_handle,
 					uint32_t out_max_xfer =
 					    DDMA_MAX_TRANSFER_SIZE -
 					    (DDMA_MAX_TRANSFER_SIZE % 4);
+
 					if (ep->dwc_ep.is_in) {
 						if (ep->dwc_ep.maxxfer >
 						    DDMA_MAX_TRANSFER_SIZE) {
@@ -2373,6 +2504,7 @@ int dwc_otg_pcd_ep_queue(dwc_otg_pcd_t * pcd, void *ep_handle,
 					    (ep->dwc_ep.maxxfer %
 					     ep->dwc_ep.maxpacket);
 				}
+
 				if (zero) {
 					if ((ep->dwc_ep.total_len %
 					     ep->dwc_ep.maxpacket == 0)
@@ -2482,7 +2614,7 @@ int dwc_otg_pcd_ep_wedge(dwc_otg_pcd_t * pcd, void *ep_handle)
 			 ep->dwc_ep.is_in ? "IN" : "OUT");
 		retval = -DWC_E_AGAIN;
 	} else {
-                /* This code needs to be reviewed */
+		/* This code needs to be reviewed */
 		if (ep->dwc_ep.is_in == 1 && GET_CORE_IF(pcd)->dma_desc_enable) {
 			dtxfsts_data_t txstatus;
 			fifosize_data_t txfifosize;
@@ -2731,8 +2863,37 @@ void dwc_otg_pcd_disconnect_us(dwc_otg_pcd_t * pcd, int no_of_usecs)
 		DWC_MODIFY_REG32(&core_if->dev_if->dev_global_regs->dctl, 0, dctl.d32);
 		dwc_udelay(no_of_usecs);
 		DWC_MODIFY_REG32(&core_if->dev_if->dev_global_regs->dctl, dctl.d32,0);
+	} else {
+		DWC_PRINTF("NOT SUPPORTED IN HOST MODE\n");
+	}
+	return;
+}
 
-	} else{
+void dwc_otg_pcd_soft_disconnect(dwc_otg_pcd_t * pcd)
+{
+	dwc_otg_core_if_t *core_if = GET_CORE_IF(pcd);
+	dctl_data_t dctl = { 0 };
+
+	if (dwc_otg_is_device_mode(core_if)) {
+		dctl.b.sftdiscon = 1;
+		DWC_PRINTF("Soft disconnect indefinitely\n");
+		DWC_MODIFY_REG32(&core_if->dev_if->dev_global_regs->dctl, 0, dctl.d32);
+	} else {
+		DWC_PRINTF("NOT SUPPORTED IN HOST MODE\n");
+	}
+	return;
+}
+
+void dwc_otg_pcd_end_soft_disconnect(dwc_otg_pcd_t * pcd)
+{
+	dwc_otg_core_if_t *core_if = GET_CORE_IF(pcd);
+	dctl_data_t dctl = { 0 };
+
+	if (dwc_otg_is_device_mode(core_if)) {
+		dctl.b.sftdiscon = 1;
+		DWC_PRINTF("Resume from soft disconnect\n");
+		DWC_MODIFY_REG32(&core_if->dev_if->dev_global_regs->dctl, dctl.d32,0);
+	} else {
 		DWC_PRINTF("NOT SUPPORTED IN HOST MODE\n");
 	}
 	return;
@@ -2749,7 +2910,7 @@ void dwc_otg_pcd_softconnect(dwc_otg_pcd_t * pcd, int is_set)
 		DWC_SPINLOCK_IRQSAVE(pcd->lock, &flags);
 		dctl.b.sftdiscon = 1;
 		if (is_set) {
-			DWC_MODIFY_REG32(&core_if->dev_if->dev_global_regs->dctl, dctl.d32,0);
+			DWC_MODIFY_REG32(&core_if->dev_if->dev_global_regs->dctl, dctl.d32, 0);
 		} else {
 			DWC_MODIFY_REG32(&core_if->dev_if->dev_global_regs->dctl, 0, dctl.d32);
 		}

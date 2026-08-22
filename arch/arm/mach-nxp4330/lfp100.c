@@ -829,6 +829,17 @@ int lfp100_is_usb_present(void)
 }
 EXPORT_SYMBOL(lfp100_is_usb_present);
 
+int lfp100_is_ac(void)
+{
+	int ret = 0;
+
+	ret = ((lfp100_read_reg(LFP100_STATUS1) & LFP100_STATUS1_SOURCE_MASK) ==
+		 LFP100_STATUS1_SOURCE_AC) ? 1 : 0;
+
+	return ret;
+}
+EXPORT_SYMBOL(lfp100_is_ac);
+
 int lfp100_is_charging_active(void)
 {
 	int ret = 0;

@@ -169,6 +169,9 @@ static int bma_detect(struct lf1000_aclmtr* dev)
 	case XANADU:
 		bus = 1;
 		break;
+	case LOWCOST:
+		bus = 1;
+		break;
 	case UNKNOWN:
 		break;
 
@@ -208,7 +211,8 @@ static int bma_detect(struct lf1000_aclmtr* dev)
 		        behaves as expected */
 
 			if (get_leapfrog_platform() == CABO ||
-				get_leapfrog_platform() == XANADU)
+				get_leapfrog_platform() == XANADU || 
+				get_leapfrog_platform() == LOWCOST)
                                 dev->scalez *= -1;
 			return 1;
 		}
@@ -226,7 +230,8 @@ static int bma_detect(struct lf1000_aclmtr* dev)
 			if (get_leapfrog_platform() == LUCY)
 				dev->scalex = dev->scalez *= -1;
 			if (get_leapfrog_platform() == CABO ||
-				get_leapfrog_platform() == XANADU)
+				get_leapfrog_platform() == XANADU ||
+				get_leapfrog_platform() == LOWCOST)
                                 dev->scalez *= -1;
 			return 1;
 		}
@@ -385,7 +390,8 @@ static void input_work_task(struct	work_struct *work)
 	to Rio and the UI behaves as expected */  
 
 	if (get_leapfrog_platform() == CABO ||
-		get_leapfrog_platform() == XANADU) {
+		get_leapfrog_platform() == XANADU ||
+		get_leapfrog_platform() == LOWCOST) {
 		t = x;
 		x = y;
 		y = t;	
@@ -405,7 +411,8 @@ static void input_work_task(struct	work_struct *work)
 		if(i_dev->isflat)
 			orient = 1;
 		if (get_leapfrog_platform() == CABO ||
-			get_leapfrog_platform() == XANADU) {
+			get_leapfrog_platform() == XANADU ||
+			get_leapfrog_platform() == LOWCOST) {
 		 /* swizzle orientation to rectify effect of incorrect mounting*/
                                 switch (orient) {
                                	case 0: orient = 7; break;
@@ -691,7 +698,8 @@ static ssize_t set_raw_only(struct device *dev, struct device_attribute *attr,
 		if (get_leapfrog_platform() == LUCY)
 			i_dev->scalex = i_dev->scalez *= -1;
 		if (get_leapfrog_platform() == CABO ||
-			get_leapfrog_platform() == XANADU)
+			get_leapfrog_platform() == XANADU ||
+			get_leapfrog_platform() == LOWCOST)
                         i_dev->scalez *= -1;
 		calibrate(i_dev);
 	}
@@ -701,7 +709,8 @@ static ssize_t set_raw_only(struct device *dev, struct device_attribute *attr,
 		if (get_leapfrog_platform() == LUCY)
 			i_dev->scalex = i_dev->scalez *= -1;
 		if (get_leapfrog_platform() == CABO ||
-			get_leapfrog_platform() == XANADU)
+			get_leapfrog_platform() == XANADU ||
+			get_leapfrog_platform() == LOWCOST)
                         i_dev->scalez *= -1;
 		calibrate(i_dev);
 	}
